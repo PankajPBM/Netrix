@@ -52,7 +52,7 @@ export const sessionApi = baseApi.injectEndpoints({
             sessionId,
             targetNetrixId: payload.targetNetrixId,
             targetDeviceName: `Remote Endpoint (${payload.targetNetrixId})`,
-            technicianName: 'Pankaj Sharma',
+            technicianName: 'Pankaj Kushwaha',
             technicianEmail: 'admin@pbtechzone.com',
             status: 'active',
             duration: '00:00:15',
@@ -98,3 +98,4 @@ export const {
   useDispatchSessionMutation,
   useTerminateSessionMutation,
 } = sessionApi;
+

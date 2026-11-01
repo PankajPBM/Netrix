@@ -151,3 +151,4 @@ export const {
   useRegisterDeviceMutation,
   useDeleteDeviceMutation,
 } = deviceApi;
+

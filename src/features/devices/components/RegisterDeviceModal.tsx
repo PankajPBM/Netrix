@@ -191,3 +191,4 @@ export const RegisterDeviceModal: React.FC<RegisterDeviceModalProps> = ({ isOpen
     </div>
   );
 };
+

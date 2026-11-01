@@ -58,3 +58,4 @@ export const preferencesSlice = createSlice({
 
 export const { setTheme, toggleSidebar, setSidebarCollapsed, setSoundAlerts } = preferencesSlice.actions;
 export default preferencesSlice.reducer;
+

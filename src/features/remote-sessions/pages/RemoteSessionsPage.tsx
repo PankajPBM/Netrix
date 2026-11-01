@@ -223,47 +223,9 @@ export const RemoteSessionsPage: React.FC = () => {
             <span className="fw-bold text-white fs-6">Concluded Session Records</span>
             <span className="text-muted small">Immutable E2EE audit trail</span>
           </div>
-          <div className="card-body p-0">
-            <div className="table-responsive">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Session ID</th>
-                    <th>Target Device</th>
-                    <th>Technician</th>
-                    <th>Total Duration</th>
-                    <th>Concluded At</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><span className="font-mono text-white small">NX-88192-FIN</span></td>
-                    <td><span className="fw-medium text-white">NYC-FIN-SRV01</span></td>
-                    <td><span className="small text-muted">Pankaj Sharma</span></td>
-                    <td><span className="font-mono small">01h 14m 22s</span></td>
-                    <td><span className="text-muted small">2026-11-01 07:15</span></td>
-                    <td><span className="badge bg-secondary-subtle text-secondary">Normal Exit</span></td>
-                  </tr>
-                  <tr>
-                    <td><span className="font-mono text-white small">NX-88145-LDN</span></td>
-                    <td><span className="fw-medium text-white">LDN-ENG-WKST04</span></td>
-                    <td><span className="small text-muted">Alex Patel</span></td>
-                    <td><span className="font-mono small">00h 42m 10s</span></td>
-                    <td><span className="text-muted small">2026-11-01 05:30</span></td>
-                    <td><span className="badge bg-secondary-subtle text-secondary">Normal Exit</span></td>
-                  </tr>
-                  <tr>
-                    <td><span className="font-mono text-white small">NX-88091-SGP</span></td>
-                    <td><span className="fw-medium text-white">SGP-PROD-DB01</span></td>
-                    <td><span className="small text-muted">Emi Tanaka</span></td>
-                    <td><span className="font-mono small">00h 18m 45s</span></td>
-                    <td><span className="text-muted small">2026-10-31 23:10</span></td>
-                    <td><span className="badge bg-secondary-subtle text-secondary">Normal Exit</span></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+          <div className="card-body p-4 text-center text-muted">
+            <History size={36} className="mb-2 opacity-50" />
+            <p className="small mb-0">No past remote desktop sessions recorded yet.</p>
           </div>
         </div>
       )}

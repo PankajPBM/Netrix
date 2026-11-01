@@ -21,3 +21,4 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ children, allowedRoles }) 
 
   return <>{children}</>;
 };
+

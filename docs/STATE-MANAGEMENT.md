@@ -62,3 +62,4 @@ Features define domain endpoints utilizing `injectEndpoints`:
 | `Licenses` | `getCurrentLicense`, `getActivations` | `activateLicenseKey`, `deactivateSeat` |
 | `Technicians` | `getTechnicians` | `updateTechnicianStatus`, `assignSession` |
 | `Activity` | `getActivityLogs` | Session events, device actions, member changes |
+

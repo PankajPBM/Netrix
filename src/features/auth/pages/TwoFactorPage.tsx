@@ -16,7 +16,6 @@ export const TwoFactorPage: React.FC = () => {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
   } = useForm<TwoFactorFormData>({
     resolver: zodResolver(twoFactorSchema),
@@ -31,11 +30,15 @@ export const TwoFactorPage: React.FC = () => {
 
     setTimeout(() => {
       setIsVerifying(false);
-      if (data.code === '123456' || data.code.length === 6) {
+      if (data.code.length === 6) {
         dispatch(
           setCredentials({
-            user: DEFAULT_MOCK_USER,
-            accessToken: 'mock_jwt_verified_token_' + Date.now(),
+            user: {
+              ...DEFAULT_MOCK_USER,
+              name: 'Pankaj Kushwaha',
+              organizationName: 'PB Tech Zone',
+            },
+            accessToken: 'nx_verified_token_' + Date.now(),
           })
         );
         navigate('/');
@@ -57,7 +60,7 @@ export const TwoFactorPage: React.FC = () => {
           </div>
           <h1 className="fs-4 fw-bold text-white mb-1">Two-Factor Verification</h1>
           <p className="text-muted small">
-            Enter the 6-digit TOTP code from your mobile authenticator app (Google Authenticator, Microsoft Authenticator, or YubiKey).
+            Enter the 6-digit TOTP code from your mobile authenticator app.
           </p>
         </div>
 
@@ -86,16 +89,6 @@ export const TwoFactorPage: React.FC = () => {
             {errors.code && (
               <div className="text-danger small mt-1 text-center">{errors.code.message}</div>
             )}
-            <div className="text-center mt-2">
-              <button
-                type="button"
-                onClick={() => setValue('code', '123456')}
-                className="btn btn-ghost btn-sm text-primary py-0"
-                style={{ fontSize: '0.75rem' }}
-              >
-                Use Demo Code (123456)
-              </button>
-            </div>
           </div>
 
           <button

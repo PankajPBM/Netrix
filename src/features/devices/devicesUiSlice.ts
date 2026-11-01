@@ -75,3 +75,4 @@ export const {
 } = devicesUiSlice.actions;
 
 export default devicesUiSlice.reducer;
+

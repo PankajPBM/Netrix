@@ -67,7 +67,7 @@ export const RegisterPage: React.FC = () => {
                 id="reg-name"
                 type="text"
                 className={`form-control ${errors.name ? 'is-invalid' : ''}`}
-                placeholder="Pankaj Sharma"
+                placeholder="Pankaj Kushwaha"
                 {...register('name')}
               />
             </div>
@@ -162,3 +162,4 @@ export const RegisterPage: React.FC = () => {
     </div>
   );
 };
+

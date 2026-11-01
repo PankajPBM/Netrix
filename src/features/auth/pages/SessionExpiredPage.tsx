@@ -24,3 +24,4 @@ export const SessionExpiredPage: React.FC = () => {
     </div>
   );
 };
+

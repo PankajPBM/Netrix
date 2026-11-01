@@ -1,25 +1,22 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { AuthState, User } from './types';
 
-// Default mock user for enterprise development mode
 export const DEFAULT_MOCK_USER: User = {
   id: 'usr_pbtech_001',
   email: 'admin@pbtechzone.com',
-  name: 'Pankaj Sharma',
+  name: 'Pankaj Kushwaha',
   role: 'SuperAdmin',
   organizationId: 'org_pbtech_hq',
-  organizationName: 'PB Tech Zone Enterprise',
-  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+  organizationName: 'PB Tech Zone',
   twoFactorEnabled: true,
-  lastLoginAt: '2026-11-01T08:30:00Z',
+  lastLoginAt: new Date().toISOString(),
 };
 
-const isMockEnabled = import.meta.env.VITE_ENABLE_MOCK_API === 'true';
-
+// Application starts in clean signed-out state requiring real login
 const initialState: AuthState = {
-  user: isMockEnabled ? DEFAULT_MOCK_USER : null,
-  accessToken: isMockEnabled ? 'mock_jwt_access_token_netrix_prod' : null,
-  isAuthenticated: isMockEnabled,
+  user: null,
+  accessToken: null,
+  isAuthenticated: false,
   isLoading: false,
   error: null,
   twoFactorPending: {
@@ -63,7 +60,6 @@ export const authSlice = createSlice({
       state.isAuthenticated = false;
       state.twoFactorPending = { pending: false, tempToken: null, email: null };
       state.error = null;
-      // Do not wipe global preferences (like theme) on logout
     },
     setAuthLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;

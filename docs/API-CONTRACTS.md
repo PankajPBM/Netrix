@@ -24,7 +24,7 @@ Authenticates a user with email and password.
       "user": {
         "id": "usr_991823",
         "email": "admin@pbtechzone.com",
-        "name": "Pankaj Sharma",
+        "name": "Pankaj Kushwaha",
         "role": "SuperAdmin",
         "organizationId": "org_pbtech_01",
         "organizationName": "PB Tech Zone Global",
@@ -191,3 +191,4 @@ Generates a customer one-click support invitation link and 6-digit access code.
 - `POST /v1/licenses/activate`
 - `GET /v1/activity/logs`
 - `GET /v1/admin/telemetry`
+

@@ -31,3 +31,4 @@ describe('Preferences Redux Slice', () => {
     expect(state.soundAlertsEnabled).toBe(false);
   });
 });
+

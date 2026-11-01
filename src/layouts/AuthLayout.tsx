@@ -46,3 +46,4 @@ export const AuthLayout: React.FC = () => {
     </div>
   );
 };
+

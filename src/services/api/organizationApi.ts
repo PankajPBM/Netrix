@@ -17,35 +17,11 @@ export interface OrgMember {
 const mockMembers: OrgMember[] = [
   {
     id: 'mem_01',
-    name: 'Pankaj Sharma',
+    name: 'Pankaj Kushwaha',
     email: 'admin@pbtechzone.com',
     role: 'SuperAdmin',
     status: 'active',
     lastActive: 'Active Now',
-  },
-  {
-    id: 'mem_02',
-    name: 'Alex Patel',
-    email: 'alex.patel@pbtechzone.com',
-    role: 'TechnicianLead',
-    status: 'active',
-    lastActive: '5 mins ago',
-  },
-  {
-    id: 'mem_03',
-    name: 'Sarah Connor',
-    email: 'sarah.connor@pbtechzone.com',
-    role: 'Technician',
-    status: 'active',
-    lastActive: '18 mins ago',
-  },
-  {
-    id: 'mem_04',
-    name: 'David Vance',
-    email: 'd.vance@pbtechzone.com',
-    role: 'Viewer',
-    status: 'invited',
-    lastActive: 'Pending invite',
   },
 ];
 
@@ -100,3 +76,4 @@ export const {
   useGetOrganizationMembersQuery,
   useInviteMemberMutation,
 } = organizationApi;
+

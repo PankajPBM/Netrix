@@ -32,25 +32,14 @@ import { useAppDispatch, useAppSelector } from '@/app/store';
 import { openQuickConnectModal } from '@/features/remote-sessions/sessionUiSlice';
 import { Link } from 'react-router-dom';
 
-const connectionTrendData = [
-  { time: '02:00', sessions: 8, bandwidth: 18 },
-  { time: '04:00', sessions: 5, bandwidth: 12 },
-  { time: '06:00', sessions: 14, bandwidth: 32 },
-  { time: '08:00', sessions: 39, bandwidth: 84 },
-  { time: '10:00', sessions: 52, bandwidth: 114 },
-  { time: '12:00', sessions: 48, bandwidth: 96 },
-  { time: '14:00', sessions: 61, bandwidth: 142 },
-  { time: '16:00', sessions: 54, bandwidth: 122 },
-  { time: '18:00', sessions: 31, bandwidth: 68 },
-  { time: '20:00', sessions: 22, bandwidth: 44 },
-  { time: '22:00', sessions: 15, bandwidth: 28 },
-];
-
-const osDistributionData = [
-  { name: 'Windows', value: 68, color: '#3B82F6' },
-  { name: 'Linux', value: 20, color: '#10B981' },
-  { name: 'macOS', value: 8, color: '#F59E0B' },
-  { name: 'Android', value: 4, color: '#8B5CF6' },
+const emptyTrendData = [
+  { time: '00:00', sessions: 0, bandwidth: 0 },
+  { time: '04:00', sessions: 0, bandwidth: 0 },
+  { time: '08:00', sessions: 0, bandwidth: 0 },
+  { time: '12:00', sessions: 0, bandwidth: 0 },
+  { time: '16:00', sessions: 0, bandwidth: 0 },
+  { time: '20:00', sessions: 0, bandwidth: 0 },
+  { time: '23:59', sessions: 0, bandwidth: 0 },
 ];
 
 export const DashboardPage: React.FC = () => {
@@ -66,6 +55,23 @@ export const DashboardPage: React.FC = () => {
   const onlineDevices = devices?.filter((d) => d.status === 'online').length || 0;
   const offlineDevices = devices?.filter((d) => d.status === 'offline').length || 0;
   const inSessionCount = activeSessions?.length || 0;
+
+  const windowsCount = devices?.filter((d) => d.osType === 'windows').length || 0;
+  const linuxCount = devices?.filter((d) => d.osType === 'linux').length || 0;
+  const macCount = devices?.filter((d) => d.osType === 'mac').length || 0;
+  const androidCount = devices?.filter((d) => d.osType === 'android').length || 0;
+
+  const osDistributionData =
+    totalDevices > 0
+      ? [
+          { name: 'Windows', value: Math.round((windowsCount / totalDevices) * 100), color: '#3B82F6' },
+          { name: 'Linux', value: Math.round((linuxCount / totalDevices) * 100), color: '#10B981' },
+          { name: 'macOS', value: Math.round((macCount / totalDevices) * 100), color: '#F59E0B' },
+          { name: 'Android', value: Math.round((androidCount / totalDevices) * 100), color: '#8B5CF6' },
+        ].filter((i) => i.value > 0)
+      : [{ name: 'No Devices Enrolled', value: 100, color: '#334155' }];
+
+  const connectionTrendData = emptyTrendData;
 
   if (isDevicesLoading || isSessionsLoading) {
     return <LoadingSpinner message="Synchronizing enterprise fleet telemetry..." />;

@@ -21,7 +21,7 @@ export const SettingsPage: React.FC = () => {
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
   // Profile Form state
-  const [name, setName] = useState(user?.name || 'Pankaj Sharma');
+  const [name, setName] = useState(user?.name || 'Pankaj Kushwaha');
   const [email] = useState(user?.email || 'admin@pbtechzone.com');
 
   // Security Form state

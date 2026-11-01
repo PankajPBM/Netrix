@@ -134,3 +134,4 @@ src/
    - `Viewer / Audit`: Read-only access to audit logs and device statuses.
 3. **Data Sanitization & Injection Defense:** No usage of `dangerouslySetInnerHTML`. Form inputs parsed through Zod. Dynamic URLs validated before protocol launching.
 4. **Native Client Handshake:** Remote session requests generate single-use, time-bound (60 seconds) cryptographically signed session tickets (`st_...`). The web application never receives or stores the target machine's operating system credentials.
+

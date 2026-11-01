@@ -45,3 +45,4 @@ describe('Devices UI Redux Slice', () => {
     expect(state.selectedDeviceIds).toHaveLength(0);
   });
 });
+

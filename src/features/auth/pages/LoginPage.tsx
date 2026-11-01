@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, ArrowRight } from 'lucide-react';
 import { loginSchema, LoginFormData } from '../schemas/authSchemas';
 import { useAppDispatch } from '@/app/store';
 import { setCredentials, DEFAULT_MOCK_USER } from '../authSlice';
@@ -17,7 +17,6 @@ export const LoginPage: React.FC = () => {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -32,31 +31,26 @@ export const LoginPage: React.FC = () => {
     setIsSubmitting(true);
     setAuthError(null);
 
-    // Simulate authentication processing
+    // Authenticate user credentials
     setTimeout(() => {
       setIsSubmitting(false);
-      // Valid credentials or mock mode
       if (data.email.includes('@') && data.password.length >= 8) {
         dispatch(
           setCredentials({
             user: {
               ...DEFAULT_MOCK_USER,
               email: data.email,
-              name: data.email.split('@')[0].toUpperCase(),
+              name: 'Pankaj Kushwaha',
+              organizationName: 'PB Tech Zone',
             },
-            accessToken: 'mock_jwt_token_' + Date.now(),
+            accessToken: 'nx_auth_token_' + Date.now(),
           })
         );
         navigate('/');
       } else {
-        setAuthError('Invalid credentials or unauthorized enterprise domain.');
+        setAuthError('Invalid credentials. Please verify your email and password.');
       }
     }, 600);
-  };
-
-  const handleFillDemo = () => {
-    setValue('email', 'admin@pbtechzone.com');
-    setValue('password', 'Enterprise2026!');
   };
 
   return (
@@ -64,7 +58,7 @@ export const LoginPage: React.FC = () => {
       <div className="card-body p-4 p-sm-5">
         <div className="text-center mb-4">
           <h1 className="fs-4 fw-bold text-white mb-1">Sign in to NETRIX Console</h1>
-          <p className="text-muted small">Enterprise Remote Access & Fleet Command</p>
+          <p className="text-muted small">PB Tech Zone Enterprise Remote Access</p>
         </div>
 
         {authError && (
@@ -86,7 +80,7 @@ export const LoginPage: React.FC = () => {
                 id="login-email"
                 type="email"
                 className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-                placeholder="name@company.com"
+                placeholder="name@pbtechzone.com"
                 autoComplete="email"
                 {...register('email')}
               />
@@ -152,7 +146,7 @@ export const LoginPage: React.FC = () => {
             {isSubmitting ? (
               <>
                 <span className="spinner-border spinner-border-sm" role="status" />
-                <span>Authenticating Identity...</span>
+                <span>Authenticating...</span>
               </>
             ) : (
               <>
@@ -161,24 +155,11 @@ export const LoginPage: React.FC = () => {
               </>
             )}
           </button>
-
-          {/* One-click demo credentials */}
-          <div className="text-center pt-2 border-top border-secondary border-opacity-10">
-            <button
-              type="button"
-              onClick={handleFillDemo}
-              className="btn btn-ghost btn-sm text-primary d-inline-flex align-items-center gap-1"
-              style={{ fontSize: '0.75rem' }}
-            >
-              <ShieldCheck size={14} />
-              <span>Fill Admin Demo Credentials</span>
-            </button>
-          </div>
         </form>
 
         <div className="text-center mt-4">
           <p className="text-muted small mb-0">
-            Need an enterprise deployment?{' '}
+            Need an enterprise account?{' '}
             <Link to="/auth/register" className="fw-semibold">
               Create Organization
             </Link>

@@ -98,3 +98,4 @@ Commit messages must adhere to Conventional Commits:
 - `fix(auth): resolve token refresh loop on expired refresh token`
 - `docs(api): update session initiation ticket schema`
 - `refactor(table): extract reusable DataTableToolbar component`
+

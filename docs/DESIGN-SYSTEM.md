@@ -76,3 +76,4 @@ NETRIX delivers a distinctive, high-trust visual language tailored for IT leader
 The design system supports dynamic switching via the `data-bs-theme` or `data-netrix-theme` attribute on the root `<html>` document.
 - In **Dark Mode (Default)**, surfaces are deep graphite/slate with crisp luminous contrast for prolonged operations room viewing.
 - In **Light Mode**, surfaces convert to clean architectural whites (`#FFFFFF`), whisper greys (`#F8FAFC`), and charcoal typography (`#0F172A`) while retaining brand identity and contrast.
+

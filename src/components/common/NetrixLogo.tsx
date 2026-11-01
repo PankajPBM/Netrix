@@ -71,3 +71,4 @@ export const NetrixLogo: React.FC<NetrixLogoProps> = ({
     </div>
   );
 };
+

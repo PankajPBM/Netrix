@@ -31,3 +31,4 @@ export function launchNetrixClient(uri: string): Promise<boolean> {
     }
   });
 }
+
