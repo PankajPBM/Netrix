@@ -1,0 +1,8 @@
+name = "netrix"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+# Custom Domain Route
+routes = [
+  { pattern = "netrix.prakashkushwaha77.com.np/*", zone_name = "prakashkushwaha77.com.np" }
+]
