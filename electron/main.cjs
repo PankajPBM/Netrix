@@ -1,22 +1,26 @@
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, screen } = require('electron');
 const path = require('path');
+const InputDriver = require('./inputDriver.cjs');
+const ScreenCaptureDriver = require('./screenCaptureDriver.cjs');
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
+let mainWindow = null;
+
 function createWindow() {
-  const mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 820,
-    minWidth: 980,
-    minHeight: 650,
-    title: 'NETRIX — Enterprise Remote Desktop & Support',
+  mainWindow = new BrowserWindow({
+    width: 1360,
+    height: 860,
+    minWidth: 1024,
+    minHeight: 700,
+    title: 'NETRIX Remote — Enterprise Remote Desktop & Support',
     backgroundColor: '#080C14',
     icon: path.join(__dirname, '../public/favicon.svg'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.cjs'),
-      sandbox: true,
+      sandbox: false, // Required for desktopCapturer & Koffi IPC
     },
     autoHideMenuBar: true,
   });
@@ -38,6 +42,32 @@ function createWindow() {
   });
 }
 
+// IPC Handlers for Screen Capture & Input Injection
+ipcMain.handle('netrix:get-screen-sources', async () => {
+  return await ScreenCaptureDriver.getScreenSources();
+});
+
+ipcMain.handle('netrix:get-primary-display', () => {
+  const primary = screen.getPrimaryDisplay();
+  return {
+    width: primary.size.width,
+    height: primary.size.height,
+    scaleFactor: primary.scaleFactor,
+  };
+});
+
+ipcMain.on('netrix:inject-mouse-move', (_event, { x, y }) => {
+  InputDriver.setCursorPos(x, y);
+});
+
+ipcMain.on('netrix:inject-mouse-action', (_event, { type, button, delta }) => {
+  InputDriver.mouseAction(type, button, delta);
+});
+
+ipcMain.on('netrix:inject-keyboard-action', (_event, { type, keyCode }) => {
+  InputDriver.keyboardAction(type, keyCode);
+});
+
 // Single instance lock
 const gotTheLock = app.requestSingleInstanceLock();
 
@@ -45,15 +75,13 @@ if (!gotTheLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    const windows = BrowserWindow.getAllWindows();
-    if (windows.length > 0) {
-      if (windows[0].isMinimized()) windows[0].restore();
-      windows[0].focus();
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
     }
   });
 
   app.whenReady().then(() => {
-    // Register custom OS protocol for netrix://
     if (!app.isDefaultProtocolClient('netrix')) {
       app.setAsDefaultProtocolClient('netrix');
     }
@@ -71,4 +99,3 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
-

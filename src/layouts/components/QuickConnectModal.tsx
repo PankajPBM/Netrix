@@ -16,9 +16,9 @@ import {
   setTargetNetrixId,
   setLaunchState,
   setSessionTicket,
+  openRemoteViewer,
 } from '@/features/remote-sessions/sessionUiSlice';
 import { useDispatchSessionMutation } from '@/services/api/sessionApi';
-import { launchNetrixClient } from '@/services/protocol/clientLauncher';
 
 export const QuickConnectModal: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -62,15 +62,10 @@ export const QuickConnectModal: React.FC = () => {
       }).unwrap();
 
       dispatch(setSessionTicket(res.sessionTicket));
-      dispatch(setLaunchState('launching_client'));
+      dispatch(setLaunchState('client_active'));
 
-      // Launch via OS registered URI handler
-      const launched = await launchNetrixClient(res.protocolLaunchUri);
-      if (launched) {
-        dispatch(setLaunchState('client_active'));
-      } else {
-        dispatch(setLaunchState('idle'));
-      }
+      // Launch live interactive WebRTC Viewer
+      dispatch(openRemoteViewer({ targetId: cleanId, role: 'client' }));
     } catch {
       setErrorMsg('Failed to authorize session ticket. Target host may be offline or unauthorized.');
       dispatch(setLaunchState('failed'));

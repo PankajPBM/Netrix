@@ -108,6 +108,41 @@ export default {
       return new Response(null, { status: 404, statusText: 'Not Found' });
     }
 
+    // 2. Real-Time WebRTC WebSocket Signaling Gateway: /netrix/ws
+    if (rawPath === '/netrix/ws' && request.headers.get('Upgrade') === 'websocket') {
+      const pair = new WebSocketPair();
+      const [client, server] = Object.values(pair);
+      server.accept();
+
+      const clientId = url.searchParams.get('id') || 'peer_' + Date.now();
+      const targetPeerId = url.searchParams.get('peerId');
+
+      if (!globalThis.__netrixSignalingPeers) {
+        globalThis.__netrixSignalingPeers = new Map();
+      }
+      globalThis.__netrixSignalingPeers.set(clientId, server);
+
+      server.addEventListener('message', (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          const destination = msg.to || targetPeerId;
+          if (destination && globalThis.__netrixSignalingPeers.has(destination)) {
+            const peerSocket = globalThis.__netrixSignalingPeers.get(destination);
+            peerSocket.send(JSON.stringify(msg));
+          }
+        } catch (e) {}
+      });
+
+      server.addEventListener('close', () => {
+        globalThis.__netrixSignalingPeers.delete(clientId);
+      });
+
+      return new Response(null, {
+        status: 101,
+        webSocket: client,
+      });
+    }
+
     // Handle Preflight CORS OPTIONS
     if (method === 'OPTIONS') {
       return new Response(null, {

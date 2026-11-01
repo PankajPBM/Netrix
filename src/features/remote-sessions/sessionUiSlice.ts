@@ -8,6 +8,9 @@ interface SessionUiState {
   launchState: ProtocolLaunchState;
   activeSessionTicket: string | null;
   launchError: string | null;
+  isViewerOpen: boolean;
+  viewerTargetId: string;
+  viewerRole: 'client' | 'host';
 }
 
 const initialState: SessionUiState = {
@@ -16,6 +19,9 @@ const initialState: SessionUiState = {
   launchState: 'idle',
   activeSessionTicket: null,
   launchError: null,
+  isViewerOpen: false,
+  viewerTargetId: '',
+  viewerRole: 'client',
 };
 
 export const sessionUiSlice = createSlice({
@@ -48,6 +54,19 @@ export const sessionUiSlice = createSlice({
       state.launchError = action.payload;
       state.launchState = 'failed';
     },
+    openRemoteViewer: (
+      state,
+      action: PayloadAction<{ targetId: string; role?: 'client' | 'host' }>
+    ) => {
+      state.isViewerOpen = true;
+      state.viewerTargetId = action.payload.targetId;
+      state.viewerRole = action.payload.role || 'client';
+      state.quickConnectModalOpen = false;
+    },
+    closeRemoteViewer: (state) => {
+      state.isViewerOpen = false;
+      state.viewerTargetId = '';
+    },
   },
 });
 
@@ -58,7 +77,8 @@ export const {
   setLaunchState,
   setSessionTicket,
   setLaunchError,
+  openRemoteViewer,
+  closeRemoteViewer,
 } = sessionUiSlice.actions;
 
 export default sessionUiSlice.reducer;
-

@@ -16,3 +16,15 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
+interface Window {
+  netrixDesktop?: {
+    isElectron: boolean;
+    platform: string;
+    version: string;
+    getScreenSources: () => Promise<Array<{ id: string; name: string; thumbnail: string }>>;
+    getPrimaryDisplay: () => Promise<{ width: number; height: number; scaleFactor: number }>;
+    injectMouseMove: (x: number, y: number) => void;
+    injectMouseAction: (type: 'mousedown' | 'mouseup' | 'wheel', button?: number, delta?: number) => void;
+    injectKeyboardAction: (type: 'keydown' | 'keyup', keyCode: number) => void;
+  };
+}
