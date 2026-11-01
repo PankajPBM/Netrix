@@ -6,10 +6,6 @@ import {
   BookOpen,
   Cast,
   LifeBuoy,
-  Building2,
-  Users2,
-  FileClock,
-  KeyRound,
   Settings,
   ShieldAlert,
   ChevronLeft,
@@ -29,27 +25,18 @@ export const AppSidebar: React.FC = () => {
 
   const navSections = [
     {
-      title: 'Command Center',
+      title: 'Remote Control',
       items: [
-        { path: '/', label: 'Overview', icon: LayoutDashboard },
-        { path: '/devices', label: 'Devices', icon: Monitor },
-        { path: '/address-book', label: 'Address Book', icon: BookOpen },
-        { path: '/sessions', label: 'Remote Sessions', icon: Cast },
+        { path: '/', label: 'Connect', icon: LayoutDashboard },
         { path: '/assist', label: 'NETRIX Assist', icon: LifeBuoy },
+        { path: '/address-book', label: 'Address Book', icon: BookOpen },
+        { path: '/sessions', label: 'Session History', icon: Cast },
       ],
     },
     {
-      title: 'Enterprise Management',
+      title: 'Management',
       items: [
-        { path: '/organizations', label: 'Organizations', icon: Building2 },
-        { path: '/technicians', label: 'Technicians', icon: Users2 },
-        { path: '/activity', label: 'Activity & Audit', icon: FileClock },
-        { path: '/licenses', label: 'Licenses', icon: KeyRound },
-      ],
-    },
-    {
-      title: 'System & Preferences',
-      items: [
+        { path: '/devices', label: 'Fleet Devices', icon: Monitor },
         { path: '/settings', label: 'Settings', icon: Settings },
         ...(isSuperAdmin
           ? [{ path: '/admin', label: 'Admin Console', icon: ShieldAlert }]
@@ -92,24 +79,24 @@ export const AppSidebar: React.FC = () => {
           </div>
         ))}
 
-        {/* Quick Client Download Link */}
+        {/* Cloud Console Link */}
         {!isCollapsed && (
           <div className="mt-4 p-3 rounded-2" style={{ backgroundColor: 'var(--netrix-bg-surface-elevated)', border: '1px solid var(--netrix-border)' }}>
             <div className="d-flex align-items-center justify-content-between mb-1">
-              <span className="fw-semibold text-white" style={{ fontSize: '0.8125rem' }}>NETRIX Remote Host</span>
-              <span className="badge bg-primary-subtle text-primary" style={{ fontSize: '0.6875rem' }}>v3.2</span>
+              <span className="fw-semibold text-white" style={{ fontSize: '0.8125rem' }}>Cloud Console</span>
+              <span className="badge bg-primary-subtle text-primary" style={{ fontSize: '0.6875rem' }}>PB Tech Zone</span>
             </div>
             <p className="text-muted mb-2" style={{ fontSize: '0.75rem', lineHeight: 1.4 }}>
-              Native desktop agent for unattended server & workstation deployment.
+              Web dashboard for fleet administration and server telemetry.
             </p>
             <a
-              href="https://get.netrix.pbtechzone.com/download"
+              href="https://netrix.prakashkushwaha77.com.np/netrix"
               target="_blank"
               rel="noreferrer"
               className="btn btn-outline-primary btn-sm w-100 d-flex align-items-center justify-content-center gap-1"
               style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem' }}
             >
-              <span>Download Agent</span>
+              <span>Open Web Console</span>
               <ExternalLink size={13} />
             </a>
           </div>

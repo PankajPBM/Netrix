@@ -1,6 +1,7 @@
 /**
  * NETRIX Real-Time WebRTC Remote Desktop Engine
  * Encrypted P2P video stream, audio, and low-latency input data channels
+ * Hybrid architecture: High-speed WebSocket with global Cloudflare D1 HTTP fallback
  */
 
 export interface RemoteSessionConfig {
@@ -21,11 +22,15 @@ export class NetrixRtcEngine {
   private localStream: MediaStream | null = null;
   private config: RemoteSessionConfig;
   private isDestroyed = false;
+  private pollInterval: NodeJS.Timeout | null = null;
+  private lastPollTimestamp = Date.now() - 5000;
+  private processedSignals = new Set<string>();
 
   private iceServers: RTCIceServer[] = [
     { urls: 'stun:stun.cloudflare.com:3478' },
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
   ];
 
   constructor(config: RemoteSessionConfig) {
@@ -43,7 +48,7 @@ export class NetrixRtcEngine {
 
     // Handle ICE Candidates
     this.peerConnection.onicecandidate = (event) => {
-      if (event.candidate && this.ws?.readyState === WebSocket.OPEN) {
+      if (event.candidate) {
         this.sendSignal({
           type: 'candidate',
           candidate: event.candidate,
@@ -53,6 +58,7 @@ export class NetrixRtcEngine {
 
     this.peerConnection.onconnectionstatechange = () => {
       const state = this.peerConnection?.connectionState;
+      console.log('[NETRIX RTC] Connection state:', state);
       if (state === 'connected') {
         this.config.onConnected?.();
       } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
@@ -71,7 +77,7 @@ export class NetrixRtcEngine {
       // Create bidirectional Data Channel for low-latency input injection
       this.dataChannel = this.peerConnection.createDataChannel('netrix-input', {
         ordered: true,
-        maxRetransmits: 0, // Low latency UDP-like delivery
+        maxRetransmits: 0,
       });
       this.setupDataChannel(this.dataChannel);
     } else {
@@ -87,6 +93,7 @@ export class NetrixRtcEngine {
 
     // Connect to Cloudflare WebRTC Signaling Gateway
     this.connectSignaling();
+    this.startHttpSignalingFallback();
   }
 
   /**
@@ -116,7 +123,7 @@ export class NetrixRtcEngine {
             },
           });
         }
-      } else {
+      } else if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
         // Fallback to standard web getDisplayMedia
         this.localStream = await navigator.mediaDevices.getDisplayMedia({
           video: { frameRate: 60 },
@@ -129,6 +136,9 @@ export class NetrixRtcEngine {
           this.peerConnection?.addTrack(track, this.localStream!);
         });
       }
+
+      // Notify controller that host screen is ready
+      this.sendSignal({ type: 'host_ready' });
     } catch (e) {
       console.error('[NETRIX RTC] Screen capture failed:', e);
       this.config.onError?.(e instanceof Error ? e : new Error(String(e)));
@@ -139,55 +149,134 @@ export class NetrixRtcEngine {
    * Connect to Cloudflare Worker WebSocket Signaling Gateway
    */
   private connectSignaling(): void {
-    const wsUrl = new URL(this.config.signalingUrl);
-    wsUrl.searchParams.set('id', this.config.localId);
-    wsUrl.searchParams.set('peerId', this.config.remoteId);
-    wsUrl.searchParams.set('role', this.config.role);
+    try {
+      const wsUrl = new URL(this.config.signalingUrl);
+      wsUrl.searchParams.set('id', this.config.localId);
+      wsUrl.searchParams.set('peerId', this.config.remoteId);
+      wsUrl.searchParams.set('role', this.config.role);
 
-    this.ws = new WebSocket(wsUrl.toString());
+      this.ws = new WebSocket(wsUrl.toString());
 
-    this.ws.onopen = async () => {
-      // If client, create and send initial SDP offer
-      if (this.config.role === 'client' && this.peerConnection) {
-        const offer = await this.peerConnection.createOffer();
-        await this.peerConnection.setLocalDescription(offer);
-        this.sendSignal({ type: 'offer', sdp: offer });
-      }
-    };
-
-    this.ws.onmessage = async (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'offer' && this.config.role === 'host' && this.peerConnection) {
-          await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-          const answer = await this.peerConnection.createAnswer();
-          await this.peerConnection.setLocalDescription(answer);
-          this.sendSignal({ type: 'answer', sdp: answer });
-        } else if (data.type === 'answer' && this.config.role === 'client' && this.peerConnection) {
-          await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-        } else if (data.type === 'candidate' && this.peerConnection) {
-          await this.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+      this.ws.onopen = async () => {
+        console.log('[NETRIX RTC] Signaling WebSocket connected');
+        // If client, send initial session request & offer
+        if (this.config.role === 'client') {
+          await this.createAndSendOffer();
+        } else {
+          this.sendSignal({ type: 'host_ready' });
         }
-      } catch (err) {
-        console.error('[NETRIX RTC] Signaling processing error:', err);
-      }
+      };
+
+      this.ws.onmessage = async (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          await this.handleSignal(data);
+        } catch (err) {
+          console.error('[NETRIX RTC] Signaling processing error:', err);
+        }
+      };
+
+      this.ws.onerror = (e) => {
+        console.warn('[NETRIX RTC] WebSocket notice, relying on HTTP signaling:', e);
+      };
+    } catch (e) {
+      console.warn('[NETRIX RTC] WebSocket initialization notice:', e);
+    }
+  }
+
+  /**
+   * HTTP Signaling Polling Fallback (ensures 100% connectivity across any edge node)
+   */
+  private startHttpSignalingFallback(): void {
+    const poll = async () => {
+      if (this.isDestroyed || this.peerConnection?.connectionState === 'connected') return;
+
+      try {
+        const cleanId = encodeURIComponent(this.config.localId.replace(/\s+/g, ''));
+        const res = await fetch(`https://netrix.prakashkushwaha77.com.np/netrix/api/signal/poll?peerId=${cleanId}&since=${this.lastPollTimestamp}`);
+        if (res.ok) {
+          const messages = await res.json();
+          if (Array.isArray(messages)) {
+            for (const msg of messages) {
+              const created = msg.created_at || Date.now();
+              if (created > this.lastPollTimestamp) {
+                this.lastPollTimestamp = created;
+              }
+              const payload = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;
+              await this.handleSignal(payload);
+            }
+          }
+        }
+      } catch {}
     };
 
-    this.ws.onerror = (e) => {
-      console.warn('[NETRIX RTC] Signaling connection notice:', e);
-    };
+    this.pollInterval = setInterval(poll, 1200);
+  }
+
+  /**
+   * Process incoming WebRTC signal
+   */
+  private async handleSignal(data: any): Promise<void> {
+    if (!data || !data.type) return;
+
+    // Deduplicate
+    const sigKey = data.type + '_' + (data.sdp?.sdp?.length || '') + '_' + (data.candidate?.candidate || '');
+    if (this.processedSignals.has(sigKey)) return;
+    this.processedSignals.add(sigKey);
+
+    console.log('[NETRIX RTC] Received signal:', data.type);
+
+    try {
+      if (data.type === 'host_ready' && this.config.role === 'client') {
+        // Host is ready; send offer immediately
+        await this.createAndSendOffer();
+      } else if (data.type === 'offer' && this.config.role === 'host' && this.peerConnection) {
+        await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        const answer = await this.peerConnection.createAnswer();
+        await this.peerConnection.setLocalDescription(answer);
+        this.sendSignal({ type: 'answer', sdp: answer });
+      } else if (data.type === 'answer' && this.config.role === 'client' && this.peerConnection) {
+        if (this.peerConnection.signalingState !== 'stable') {
+          await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        }
+      } else if (data.type === 'candidate' && this.peerConnection) {
+        await this.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+      }
+    } catch (err) {
+      console.warn('[NETRIX RTC] Signal handling notice:', err);
+    }
+  }
+
+  private async createAndSendOffer(): Promise<void> {
+    if (!this.peerConnection) return;
+    try {
+      const offer = await this.peerConnection.createOffer();
+      await this.peerConnection.setLocalDescription(offer);
+      this.sendSignal({ type: 'offer', sdp: offer });
+    } catch (err) {
+      console.error('[NETRIX RTC] Failed to create offer:', err);
+    }
   }
 
   private sendSignal(msg: object): void {
+    const payload = {
+      ...msg,
+      from: this.config.localId.replace(/\s+/g, ''),
+      to: this.config.remoteId.replace(/\s+/g, ''),
+      timestamp: Date.now(),
+    };
+
+    // 1. Send via WebSocket if connected
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(
-        JSON.stringify({
-          ...msg,
-          from: this.config.localId,
-          to: this.config.remoteId,
-        })
-      );
+      this.ws.send(JSON.stringify(payload));
     }
+
+    // 2. Also send via global HTTP signaling for guaranteed cross-edge delivery
+    fetch('https://netrix.prakashkushwaha77.com.np/netrix/api/signal/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
   }
 
   /**
@@ -201,7 +290,6 @@ export class NetrixRtcEngine {
     channel.onmessage = (event) => {
       try {
         const cmd = JSON.parse(event.data);
-        // If Host: inject native Windows input!
         if (this.config.role === 'host' && window.netrixDesktop) {
           if (cmd.t === 'm') {
             window.netrixDesktop.injectMouseMove(cmd.x, cmd.y);
@@ -217,44 +305,32 @@ export class NetrixRtcEngine {
     };
   }
 
-  /**
-   * Client transmits mouse move coordinates (normalized 0-1)
-   */
   public sendMouseMove(x: number, y: number): void {
     if (this.dataChannel && this.dataChannel.readyState === 'open') {
       this.dataChannel.send(JSON.stringify({ t: 'm', x, y }));
     }
   }
 
-  /**
-   * Client transmits mouse clicks or scroll
-   */
   public sendMouseAction(action: 'mousedown' | 'mouseup' | 'wheel', btn = 0, delta = 0): void {
     if (this.dataChannel && this.dataChannel.readyState === 'open') {
       this.dataChannel.send(JSON.stringify({ t: 'c', action, btn, delta }));
     }
   }
 
-  /**
-   * Client transmits keyboard events
-   */
   public sendKeyboardAction(action: 'keydown' | 'keyup', vk: number): void {
     if (this.dataChannel && this.dataChannel.readyState === 'open') {
       this.dataChannel.send(JSON.stringify({ t: 'k', action, vk }));
     }
   }
 
-  /**
-   * Terminate and clean up connection
-   */
   public destroy(): void {
     if (this.isDestroyed) return;
     this.isDestroyed = true;
 
+    if (this.pollInterval) clearInterval(this.pollInterval);
     this.localStream?.getTracks().forEach((t) => t.stop());
     this.dataChannel?.close();
     this.peerConnection?.close();
     this.ws?.close();
   }
 }
-

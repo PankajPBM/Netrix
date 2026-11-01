@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { NetrixRtcEngine } from '@/services/webrtc/netrixRtcEngine';
 
+import { getNormalizedLocalNetrixId } from '@/services/device/localDevice';
+
 interface RemoteViewerModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -36,15 +38,21 @@ export const RemoteViewerModal: React.FC<RemoteViewerModalProps> = ({
   const [statusText, setStatusText] = useState('Initiating P2P WebRTC Handshake...');
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !targetId) return;
 
     const signalingUrl = 'wss://netrix.prakashkushwaha77.com.np/netrix/ws';
-    const localId = role === 'client' ? 'controller_' + Date.now() : targetId.replace(/\s+/g, '');
+    const localId = getNormalizedLocalNetrixId();
+    const cleanTargetId = targetId.replace(/\s+/g, '');
+
+    if (localId === cleanTargetId && role === 'client') {
+      setStatusText('Cannot start remote control session to your own local address.');
+      return;
+    }
 
     const engine = new NetrixRtcEngine({
       signalingUrl,
       localId,
-      remoteId: targetId.replace(/\s+/g, ''),
+      remoteId: cleanTargetId,
       role,
       onConnected: () => {
         setIsConnected(true);
@@ -60,7 +68,7 @@ export const RemoteViewerModal: React.FC<RemoteViewerModalProps> = ({
         }
       },
       onError: (err) => {
-        setStatusText(`Error: ${err.message}`);
+        setStatusText(`Notice: ${err.message}`);
       },
     });
 

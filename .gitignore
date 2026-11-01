@@ -28,4 +28,5 @@ release
 .env.local
 .env.*.local
 *.tsbuildinfo
+cloudflare-worker/.wrangler/
 

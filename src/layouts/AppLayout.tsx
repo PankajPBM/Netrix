@@ -62,8 +62,35 @@ export const AppLayout: React.FC = () => {
 
     connect();
 
+    let lastPollTime = Date.now() - 5000;
+    const pollTimer = setInterval(async () => {
+      if (isViewerOpen) return;
+      try {
+        const res = await fetch(
+          `https://netrix.prakashkushwaha77.com.np/netrix/api/signal/poll?peerId=${localId}&since=${lastPollTime}`
+        );
+        if (res.ok) {
+          const messages = await res.json();
+          if (Array.isArray(messages)) {
+            for (const msg of messages) {
+              lastPollTime = Math.max(lastPollTime, msg.created_at || Date.now());
+              const payload =
+                typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;
+              if (
+                (payload.type === 'offer' || payload.type === 'session_request') &&
+                payload.from
+              ) {
+                setIncomingRequest({ from: payload.from });
+              }
+            }
+          }
+        }
+      } catch {}
+    }, 1500);
+
     return () => {
       if (reconnectTimer) clearTimeout(reconnectTimer);
+      clearInterval(pollTimer);
       if (ws) ws.close();
       standbyWsRef.current = null;
     };
@@ -108,16 +135,16 @@ export const AppLayout: React.FC = () => {
             <div
               className="modal-content shadow-lg border-0"
               style={{
-                backgroundColor: '#0F172A',
-                color: '#F8FAFC',
+                backgroundColor: 'var(--netrix-bg-surface)',
+                color: 'var(--netrix-text-primary)',
                 borderRadius: '12px',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
+                border: '1px solid var(--netrix-border)',
               }}
             >
-              <div className="modal-header border-bottom border-secondary pb-3">
+              <div className="modal-header border-bottom pb-3" style={{ borderColor: 'var(--netrix-border)' }}>
                 <div className="d-flex align-items-center gap-2">
                   <Shield className="text-warning" size={22} />
-                  <h5 className="modal-title mb-0 fw-bold">Incoming Remote Session Request</h5>
+                  <h5 className="modal-title mb-0 fw-bold text-white">Incoming Remote Session Request</h5>
                 </div>
                 <button
                   type="button"
@@ -128,27 +155,27 @@ export const AppLayout: React.FC = () => {
 
               <div className="modal-body py-4">
                 <p className="text-secondary small mb-3">
-                  A remote technician has initiated an encrypted session request to control this computer.
+                  A remote operator has initiated an encrypted session request to control this computer.
                 </p>
 
                 <div
                   className="p-3 rounded-3 mb-3"
                   style={{
-                    backgroundColor: '#1E293B',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    backgroundColor: 'var(--netrix-bg-input)',
+                    border: '1px solid var(--netrix-border-strong)',
                   }}
                 >
-                  <div className="text-muted small">Requester NETRIX ID:</div>
-                  <div className="fs-5 fw-bold font-mono text-primary">{incomingRequest.from}</div>
+                  <div className="text-secondary small">Requester NETRIX Address:</div>
+                  <div className="fs-4 fw-bold font-mono text-primary">{incomingRequest.from}</div>
                 </div>
 
                 <div className="alert alert-info py-2 px-3 small d-flex align-items-center gap-2 mb-0">
                   <MonitorCheck size={16} className="text-info flex-shrink-0" />
-                  <span>Accepting will initiate hardware-accelerated desktop capture and grant remote cursor and keyboard input.</span>
+                  <span>Accepting will initiate encrypted desktop streaming and grant remote cursor and keyboard input.</span>
                 </div>
               </div>
 
-              <div className="modal-footer border-top border-secondary pt-3 d-flex justify-content-between">
+              <div className="modal-footer border-top pt-3 d-flex justify-content-between" style={{ borderColor: 'var(--netrix-border)' }}>
                 <button
                   type="button"
                   className="btn btn-outline-danger px-4"

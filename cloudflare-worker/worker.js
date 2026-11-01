@@ -574,6 +574,55 @@ app.get('/netrix/api/admin/telemetry', async (c) => {
 });
 
 // -------------------------------------------------------------
+// Real-Time WebRTC Hybrid Signaling Endpoints (HTTP + WebSocket)
+// -------------------------------------------------------------
+app.post('/netrix/api/signal/send', async (c) => {
+  const db = c.env.DB;
+  const body = await c.req.json();
+  const senderId = String(body.from || '').replace(/\s+/g, '');
+  const recipientId = String(body.to || '').replace(/\s+/g, '');
+  const payloadStr = typeof body.payload === 'string' ? body.payload : JSON.stringify(body);
+  const now = Date.now();
+  const id = generateSecureToken('sig');
+
+  if (db && recipientId) {
+    await db.prepare('INSERT INTO signaling_messages (id, sender_id, recipient_id, payload, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind(id, senderId, recipientId, payloadStr, now)
+      .run();
+
+    // Clean up expired signals older than 2 minutes in background
+    c.executionCtx.waitUntil(
+      db.prepare('DELETE FROM signaling_messages WHERE created_at < ?').bind(now - 120000).run().catch(() => {})
+    );
+  }
+
+  // Also push to active WebSocket in this isolate if present
+  if (globalThis.__netrixSignalingPeers && globalThis.__netrixSignalingPeers.has(recipientId)) {
+    try {
+      globalThis.__netrixSignalingPeers.get(recipientId).send(payloadStr);
+    } catch (e) {}
+  }
+
+  return c.json({ success: true, id });
+});
+
+app.get('/netrix/api/signal/poll', async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json([]);
+  const recipientId = String(c.req.query('peerId') || '').replace(/\s+/g, '');
+  const since = parseInt(c.req.query('since') || '0', 10);
+
+  if (!recipientId) return c.json([]);
+
+  const messages = await db
+    .prepare('SELECT id, sender_id, payload, created_at FROM signaling_messages WHERE recipient_id = ? AND created_at > ? ORDER BY created_at ASC LIMIT 50')
+    .bind(recipientId, since)
+    .all();
+
+  return c.json(messages.results || []);
+});
+
+// -------------------------------------------------------------
 // Interactive Web Console HTML at /netrix
 // -------------------------------------------------------------
 app.get('/netrix', (c) => {
@@ -608,14 +657,24 @@ export default {
       }
       globalThis.__netrixSignalingPeers.set(clientId, server);
 
-      server.addEventListener('message', (event) => {
+      server.addEventListener('message', async (event) => {
         try {
           const msg = JSON.parse(event.data);
           const rawDest = msg.to || targetPeerId;
           const destination = rawDest ? String(rawDest).replace(/\s+/g, '') : null;
+          const jsonStr = JSON.stringify(msg);
+
           if (destination && globalThis.__netrixSignalingPeers.has(destination)) {
             const peerSocket = globalThis.__netrixSignalingPeers.get(destination);
-            peerSocket.send(JSON.stringify(msg));
+            peerSocket.send(jsonStr);
+          }
+
+          // Cross-edge replication in D1
+          if (destination && env.DB) {
+            const sigId = generateSecureToken('sig');
+            await env.DB.prepare('INSERT INTO signaling_messages (id, sender_id, recipient_id, payload, created_at) VALUES (?, ?, ?, ?, ?)')
+              .bind(sigId, clientId, destination, jsonStr, Date.now())
+              .run();
           }
         } catch (e) {}
       });
