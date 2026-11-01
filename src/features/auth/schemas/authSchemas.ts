@@ -1,8 +1,13 @@
 import { z } from 'zod';
 
 export const loginSchema = z.object({
-  email: z.string().min(2, 'Please enter your username or email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  email: z
+    .string()
+    .min(1, 'Username is required')
+    .refine((val) => val.trim().toLowerCase() === 'pankaj', {
+      message: 'Access Denied: Only username "Pankaj" is permitted',
+    }),
+  password: z.string().min(1, 'Password is required'),
   rememberMe: z.boolean().optional(),
 });
 

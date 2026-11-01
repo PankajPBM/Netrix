@@ -2,26 +2,29 @@ import { describe, it, expect } from 'vitest';
 import { loginSchema, twoFactorSchema, resetPasswordSchema } from '../features/auth/schemas/authSchemas';
 
 describe('Auth Validation Schemas', () => {
-  it('validates correct email and password length', () => {
+  it('strictly validates authorized username "Pankaj" and rejects any other username or email', () => {
     const valid = loginSchema.safeParse({
-      email: 'admin@pbtechzone.com',
-      password: 'StrongPassword123!',
-      rememberMe: true,
-    });
-    expect(valid.success).toBe(true);
-  });
-
-  it('validates username or business email format', () => {
-    const validUsername = loginSchema.safeParse({
       email: 'Pankaj',
       password: 'PB@TechZone',
       rememberMe: true,
     });
-    expect(validUsername.success).toBe(true);
+    expect(valid.success).toBe(true);
+
+    const lowercaseValid = loginSchema.safeParse({
+      email: 'pankaj',
+      password: 'PB@TechZone',
+    });
+    expect(lowercaseValid.success).toBe(true);
+
+    const rejectedEmail = loginSchema.safeParse({
+      email: 'admin@pbtechzone.com',
+      password: 'PB@TechZone',
+    });
+    expect(rejectedEmail.success).toBe(false);
 
     const invalid = loginSchema.safeParse({
-      email: 'a',
-      password: '123',
+      email: 'anyotheruser',
+      password: 'password123',
     });
     expect(invalid.success).toBe(false);
   });

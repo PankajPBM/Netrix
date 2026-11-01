@@ -36,16 +36,16 @@ export const LoginPage: React.FC = () => {
       setIsSubmitting(false);
       const inputUser = data.email.trim();
       const lower = inputUser.toLowerCase();
-      const isAuthorizedUser = lower === 'pankaj' || lower === 'admin@pbtechzone.com' || lower === 'pankaj@pbtechzone.com';
-      const isAuthorizedPass = data.password === 'PB@TechZone' || data.password === 'Admin1234!';
+      const isAuthorizedUser = lower === 'pankaj';
+      const isAuthorizedPass = data.password === 'PB@TechZone';
 
-      if ((isAuthorizedUser || inputUser.includes('@')) && (isAuthorizedPass || data.password.length >= 8)) {
+      if (isAuthorizedUser && isAuthorizedPass) {
         dispatch(
           setCredentials({
             user: {
               ...DEFAULT_MOCK_USER,
               username: 'Pankaj',
-              email: inputUser.includes('@') ? inputUser : 'pankaj@pbtechzone.com',
+              email: 'pankaj@pbtechzone.com',
               name: 'Pankaj Kushwaha',
               organizationName: 'PB Tech Zone',
             },
@@ -54,7 +54,7 @@ export const LoginPage: React.FC = () => {
         );
         navigate('/');
       } else {
-        setAuthError('Invalid credentials. Please verify your username (Pankaj) and password (PB@TechZone).');
+        setAuthError('Access Denied: Only username "Pankaj" with password "PB@TechZone" is authorized.');
       }
     }, 600);
   };
@@ -75,9 +75,9 @@ export const LoginPage: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmit(onSubmit)}>
-          {/* Username / Email */}
+          {/* Username */}
           <div className="mb-3">
-            <label className="form-label" htmlFor="login-email">Username or Enterprise Email</label>
+            <label className="form-label" htmlFor="login-email">Username</label>
             <div className="input-group">
               <span className="input-group-text">
                 <Mail size={16} />
@@ -86,7 +86,7 @@ export const LoginPage: React.FC = () => {
                 id="login-email"
                 type="text"
                 className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-                placeholder="Pankaj or admin@pbtechzone.com"
+                placeholder="Pankaj"
                 autoComplete="username"
                 {...register('email')}
               />

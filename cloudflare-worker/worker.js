@@ -143,11 +143,9 @@ export default {
         const userIdentifier = (body.username || body.email || '').trim().toLowerCase();
         const password = body.password || '';
 
-        const isUserMatch =
-          userIdentifier === 'pankaj' ||
-          userIdentifier === 'admin@pbtechzone.com' ||
-          userIdentifier === 'pankaj@pbtechzone.com';
-        const isPassMatch = password === 'PB@TechZone' || password === 'Admin1234!';
+        // STRICT ACCESS CONTROL: Only username "Pankaj" and password "PB@TechZone" are authorized
+        const isUserMatch = userIdentifier === 'pankaj';
+        const isPassMatch = password === 'PB@TechZone';
 
         if (isUserMatch && isPassMatch) {
           // Log audit
@@ -187,7 +185,7 @@ export default {
           return jsonResponse(
             {
               success: false,
-              error: 'Invalid credentials. Please verify your username (Pankaj) and password (PB@TechZone).',
+              error: 'Access Denied: Only username "Pankaj" with password "PB@TechZone" is authorized.',
             },
             401,
             request
@@ -503,7 +501,7 @@ function renderWebConsoleHtml() {
 
       <form id="loginForm">
         <div class="mb-3">
-          <label class="form-label small text-muted">Username or Enterprise Email</label>
+          <label class="form-label small text-muted">Username</label>
           <input type="text" id="usernameInput" class="form-control" placeholder="Pankaj" required autofocus>
         </div>
         <div class="mb-4">
