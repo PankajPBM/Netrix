@@ -1,5 +1,5 @@
 import { baseApi } from './baseApi';
-import { MockOrganization } from '../mock/mockData';
+import { Organization } from '@/types/models';
 
 export interface OrgMember {
   id: string;
@@ -12,7 +12,7 @@ export interface OrgMember {
 
 export const organizationApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getOrganizations: builder.query<MockOrganization[], void>({
+    getOrganizations: builder.query<Organization[], void>({
       query: () => '/organizations',
       providesTags: ['Organizations'],
     }),

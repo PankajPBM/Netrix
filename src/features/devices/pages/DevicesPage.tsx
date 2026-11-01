@@ -18,7 +18,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
 import { DeviceDetailModal } from '../components/DeviceDetailModal';
 import { RegisterDeviceModal } from '../components/RegisterDeviceModal';
-import { MockDevice } from '@/services/mock/mockData';
+import { Device } from '@/types/models';
 import { useAppDispatch, useAppSelector } from '@/app/store';
 import { openQuickConnectModal } from '@/features/remote-sessions/sessionUiSlice';
 import {
@@ -48,7 +48,7 @@ export const DevicesPage: React.FC = () => {
   const [toggleFavorite] = useToggleDeviceFavoriteMutation();
   const [deleteDevice] = useDeleteDeviceMutation();
 
-  const [selectedDeviceForModal, setSelectedDeviceForModal] = useState<MockDevice | null>(null);
+  const [selectedDeviceForModal, setSelectedDeviceForModal] = useState<Device | null>(null);
   const [registerModalOpen, setRegisterModalOpen] = useState(false);
 
   const allFilteredDevices = devices || [];

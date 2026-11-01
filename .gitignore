@@ -27,4 +27,5 @@ release
 # Environment
 .env.local
 .env.*.local
+*.tsbuildinfo
 

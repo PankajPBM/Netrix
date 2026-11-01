@@ -1,5 +1,5 @@
 import { baseApi } from './baseApi';
-import { MockAssistTicket } from '../mock/mockData';
+import { AssistTicket } from '@/types/models';
 
 export interface CreateAssistInviteRequest {
   clientName: string;
@@ -10,7 +10,7 @@ export interface CreateAssistInviteRequest {
 
 export const assistApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getAssistTickets: builder.query<MockAssistTicket[], void>({
+    getAssistTickets: builder.query<AssistTicket[], void>({
       query: () => '/assist/tickets',
       providesTags: (result) =>
         result
@@ -21,7 +21,7 @@ export const assistApi = baseApi.injectEndpoints({
           : [{ type: 'Assist', id: 'LIST' }],
     }),
 
-    createAssistInvite: builder.mutation<MockAssistTicket, CreateAssistInviteRequest>({
+    createAssistInvite: builder.mutation<AssistTicket, CreateAssistInviteRequest>({
       query: (body) => ({
         url: '/assist/invitations',
         method: 'POST',
@@ -30,7 +30,7 @@ export const assistApi = baseApi.injectEndpoints({
       invalidatesTags: [{ type: 'Assist', id: 'LIST' }],
     }),
 
-    updateAssistStatus: builder.mutation<MockAssistTicket, { id: string; status: MockAssistTicket['status'] }>({
+    updateAssistStatus: builder.mutation<AssistTicket, { id: string; status: AssistTicket['status'] }>({
       query: ({ id, status }) => ({
         url: `/assist/tickets/${id}`,
         method: 'PATCH',

@@ -13,7 +13,7 @@ import {
   Check,
   Star,
 } from 'lucide-react';
-import { MockDevice } from '@/services/mock/mockData';
+import { Device } from '@/types/models';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { useAppDispatch } from '@/app/store';
 import { openQuickConnectModal } from '@/features/remote-sessions/sessionUiSlice';
@@ -23,7 +23,7 @@ import {
 } from '@/services/api/deviceApi';
 
 interface DeviceDetailModalProps {
-  device: MockDevice | null;
+  device: Device | null;
   onClose: () => void;
 }
 

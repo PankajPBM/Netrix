@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search,
   Zap,
@@ -10,6 +10,8 @@ import {
   User,
   Shield,
   Building,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/app/store';
 import { setTheme, ThemeMode } from '@/app/store/preferencesSlice';
@@ -17,6 +19,7 @@ import { toggleNotificationDrawer } from '@/features/notifications/notificationS
 import { openQuickConnectModal } from '@/features/remote-sessions/sessionUiSlice';
 import { logout } from '@/features/auth/authSlice';
 import { useNavigate } from 'react-router-dom';
+import { getLocalNetrixId } from '@/services/device/localDevice';
 
 export const AppHeader: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -28,10 +31,24 @@ export const AppHeader: React.FC = () => {
 
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
+  const [localId, setLocalId] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setLocalId(getLocalNetrixId());
+  }, []);
 
   const handleLogout = () => {
     dispatch(logout());
     navigate('/auth/login');
+  };
+
+  const handleCopyId = () => {
+    if (localId) {
+      navigator.clipboard.writeText(localId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const cycleTheme = (mode: ThemeMode) => {
@@ -62,6 +79,29 @@ export const AppHeader: React.FC = () => {
 
       {/* Right Header Action Items */}
       <div className="header-actions">
+        {/* Local NETRIX Host Identity Badge */}
+        {localId && (
+          <div
+            onClick={handleCopyId}
+            className="d-none d-md-flex align-items-center gap-2 px-2 py-1 rounded-2"
+            style={{
+              backgroundColor: 'rgba(37, 99, 235, 0.1)',
+              border: '1px solid rgba(37, 99, 235, 0.3)',
+              cursor: 'pointer',
+              height: '36px',
+            }}
+            title="Your NETRIX Host ID — Click to copy"
+          >
+            <span className="text-muted small">Your ID:</span>
+            <span className="mono fw-bold text-primary small">{localId}</span>
+            {copied ? (
+              <Check size={14} className="text-success" />
+            ) : (
+              <Copy size={13} className="text-muted" />
+            )}
+          </div>
+        )}
+
         {/* Quick Connect Session Dispatch Shortcut */}
         <button
           type="button"

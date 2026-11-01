@@ -2,8 +2,13 @@ name = "netrix"
 main = "worker.js"
 compatibility_date = "2026-11-01"
 
-# Custom Domain Route
+# Custom Domain Routes
 routes = [
   { pattern = "netrix.prakashkushwaha77.com.np/*", zone_name = "prakashkushwaha77.com.np" }
 ]
 
+# Dedicated NETRIX Production D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "netrix-production-d1"
+database_id = "43b06ebf-39a7-4d38-8620-5c48ea7b34be"

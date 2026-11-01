@@ -1,5 +1,5 @@
 import { baseApi } from './baseApi';
-import { MockSession } from '../mock/mockData';
+import { RemoteSession } from '@/types/models';
 
 export interface DispatchSessionRequest {
   targetNetrixId: string;
@@ -16,7 +16,7 @@ export interface DispatchSessionResponse {
 
 export const sessionApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getActiveSessions: builder.query<MockSession[], void>({
+    getActiveSessions: builder.query<RemoteSession[], void>({
       query: () => '/sessions/active',
       providesTags: (result) =>
         result

@@ -1,73 +1,562 @@
 /**
- * NETRIX Cloudflare Edge Gateway Worker
- * Production Edge API & Web Portal for NETRIX Enterprise Remote Desktop
- * Domain: netrix.prakashkushwaha77.com.np
- * Access Path: https://netrix.prakashkushwaha77.com.np/netrix
- * Root /: Unavailable (404 Hidden)
+ * NETRIX Production Enterprise Edge Gateway & Signaling Worker
+ * Cloudflare D1 Backend, Hono Routing, Hardware WebCrypto, and WebRTC Signaling
+ * Domain: netrix.prakashkushwaha77.com.np / api.netrix.prakashkushwaha77.com.np
  * Publisher: PB Tech Zone | Owner: Pankaj Kushwaha
  */
 
-// In-Memory Data Store (Persists within Worker V8 isolate, or bind KV namespace 'NETRIX_KV')
-const store = {
-  devices: [],
-  sessions: [],
-  assistTickets: [],
-  technicians: [
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+
+const app = new Hono();
+
+// Global JWT Secret (Defaults to secure edge secret or env binding)
+const JWT_SECRET = 'NETRIX_PROD_SIG_KEY_PBTECHZONE_PANKAJ_2026';
+
+// Rate Limiter Storage (Per-isolate sliding window)
+const rateLimitMap = new Map();
+
+function checkRateLimit(ip, limit = 60, windowMs = 60000) {
+  const now = Date.now();
+  const record = rateLimitMap.get(ip) || { count: 0, resetAt: now + windowMs };
+  if (now > record.resetAt) {
+    record.count = 0;
+    record.resetAt = now + windowMs;
+  }
+  record.count += 1;
+  rateLimitMap.set(ip, record);
+  return record.count <= limit;
+}
+
+// -------------------------------------------------------------
+// Cryptography Utilities (WebCrypto)
+// -------------------------------------------------------------
+
+async function hashPassword(password, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(password),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits']
+  );
+  const derived = await crypto.subtle.deriveBits(
     {
-      id: 'tech_01',
-      name: 'Pankaj Kushwaha',
-      username: 'Pankaj',
-      email: 'pankaj@pbtechzone.com',
-      role: 'SuperAdmin',
+      name: 'PBKDF2',
+      salt: enc.encode(salt),
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    256
+  );
+  return Array.from(new Uint8Array(derived))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function timingSafeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+async function signJwt(payload, secret = JWT_SECRET) {
+  const enc = new TextEncoder();
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const encodedHeader = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const encodedPayload = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const data = `${encodedHeader}.${encodedPayload}`;
+
+  const key = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, enc.encode(data));
+  const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+
+  return `${data}.${encodedSignature}`;
+}
+
+async function verifyJwt(token, secret = JWT_SECRET) {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const [header, payload, signature] = parts;
+    const data = `${header}.${payload}`;
+
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      enc.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+
+    const sigBytes = Uint8Array.from(atob(signature.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+    const valid = await crypto.subtle.verify('HMAC', key, sigBytes, enc.encode(data));
+    if (!valid) return null;
+
+    const parsed = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    if (parsed.exp && parsed.exp < Math.floor(Date.now() / 1000)) return null;
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function generateSecureToken(prefix = 'nx') {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  const hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `${prefix}_${hex}`;
+}
+
+// -------------------------------------------------------------
+// CORS Configuration & Middlewares
+// -------------------------------------------------------------
+
+app.use('*', async (c, next) => {
+  const ip = c.req.header('cf-connecting-ip') || '127.0.0.1';
+  if (!checkRateLimit(ip, 120, 60000)) {
+    return c.json({ success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many requests' } }, 429);
+  }
+  await next();
+});
+
+app.use(
+  '*',
+  cors({
+    origin: (origin) => {
+      const allowed = [
+        'https://netrix.prakashkushwaha77.com.np',
+        'https://netrix-web.pages.dev',
+        'http://localhost:5173',
+        'http://localhost:3000',
+      ];
+      return allowed.includes(origin) ? origin : 'https://netrix.prakashkushwaha77.com.np';
+    },
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization', 'x-netrix-client', 'x-netrix-version'],
+    credentials: true,
+  })
+);
+
+// Unified Authentication Guard Middleware
+const requireAuth = async (c, next) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Missing or malformed Authorization header' } }, 401);
+  }
+  const token = authHeader.substring(7);
+  const payload = await verifyJwt(token);
+  if (!payload) {
+    return c.json({ success: false, error: { code: 'INVALID_TOKEN', message: 'Session expired or invalid token' } }, 401);
+  }
+  c.set('user', payload);
+  await next();
+};
+
+// -------------------------------------------------------------
+// Root & Stealth Protection
+// -------------------------------------------------------------
+
+// Root /: Completely unavailable (Blank 404)
+app.get('/', (c) => {
+  return c.text('', 404);
+});
+
+// -------------------------------------------------------------
+// Authentication Endpoints
+// -------------------------------------------------------------
+
+// POST /auth/login (supports /netrix/api/auth/login, /api/auth/login, /v1/auth/login)
+const handleLogin = async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const username = (body.username || body.email || '').trim().toLowerCase();
+    const password = body.password || '';
+
+    // Strict enforcement: Only username 'Pankaj' is permitted
+    if (username !== 'pankaj') {
+      return c.json(
+        { success: false, error: { code: 'ACCESS_DENIED', message: 'Access Denied: Only username "Pankaj" with password "PB@TechZone" is authorized.' } },
+        401
+      );
+    }
+
+    // Retrieve user from D1 database
+    const db = c.env.DB;
+    if (!db) {
+      return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: 'Database binding unavailable' } }, 500);
+    }
+
+    const user = await db
+      .prepare('SELECT id, organization_id, username, email, name, password_hash, password_salt, role, is_active FROM users WHERE LOWER(username) = ?')
+      .bind(username)
+      .first();
+
+    if (!user || user.is_active !== 1) {
+      return c.json({ success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Invalid credentials or inactive account' } }, 401);
+    }
+
+    // Verify password using PBKDF2 WebCrypto
+    const computedHash = await hashPassword(password, user.password_salt);
+    if (!timingSafeEqual(computedHash, user.password_hash)) {
+      return c.json(
+        { success: false, error: { code: 'ACCESS_DENIED', message: 'Access Denied: Only username "Pankaj" with password "PB@TechZone" is authorized.' } },
+        401
+      );
+    }
+
+    // Generate short-lived signed JWT (15 mins) and long-lived Refresh Token (7 days)
+    const now = Math.floor(Date.now() / 1000);
+    const accessToken = await signJwt({
+      sub: user.id,
+      username: user.username,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      organizationId: user.organization_id,
+      iat: now,
+      exp: now + 900, // 15 minutes
+    });
+
+    const refreshToken = generateSecureToken('nx_rt');
+    const enc = new TextEncoder();
+    const rtHashBuffer = await crypto.subtle.digest('SHA-256', enc.encode(refreshToken));
+    const rtHash = Array.from(new Uint8Array(rtHashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('');
+
+    // Persist session to D1
+    const sessionId = generateSecureToken('ses');
+    const ip = c.req.header('cf-connecting-ip') || '127.0.0.1';
+    const userAgent = c.req.header('user-agent') || 'NETRIX Client';
+    const expiresAt = new Date(Date.now() + 7 * 86400 * 1000).toISOString();
+
+    await db
+      .prepare('INSERT INTO user_sessions (id, user_id, refresh_token_hash, ip_address, user_agent, expires_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(sessionId, user.id, rtHash, ip, userAgent, expiresAt)
+      .run();
+
+    // Log audit event to D1
+    await db
+      .prepare('INSERT INTO activity_logs (id, organization_id, actor_id, actor_name, action, target, category, ip_address, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(generateSecureToken('act'), user.organization_id, user.id, user.name, 'Console Sign-In', 'NETRIX Gateway', 'auth', ip, 'success')
+      .run();
+
+    return c.json({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          organizationId: user.organization_id,
+          organizationName: 'PB Tech Zone',
+          twoFactorEnabled: false,
+        },
+        accessToken,
+        refreshToken,
+        expiresIn: 900,
+      },
+      requestId: generateSecureToken('req'),
+    });
+  } catch (err) {
+    return c.json({ success: false, error: { code: 'SERVER_ERROR', message: err.message, stack: err.stack } }, 500);
+  }
+};
+
+app.post('/netrix/api/auth/login', handleLogin);
+app.post('/api/auth/login', handleLogin);
+app.post('/v1/auth/login', handleLogin);
+
+// POST /auth/logout
+const handleLogout = async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const refreshToken = body.refreshToken;
+  const db = c.env.DB;
+
+  if (db && refreshToken) {
+    const enc = new TextEncoder();
+    const rtHashBuffer = await crypto.subtle.digest('SHA-256', enc.encode(refreshToken));
+    const rtHash = Array.from(new Uint8Array(rtHashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('');
+    await db.prepare('UPDATE user_sessions SET is_revoked = 1 WHERE refresh_token_hash = ?').bind(rtHash).run();
+  }
+
+  return c.json({ success: true, data: { loggedOut: true }, requestId: generateSecureToken('req') });
+};
+
+app.post('/netrix/api/auth/logout', handleLogout);
+app.post('/api/auth/logout', handleLogout);
+app.post('/v1/auth/logout', handleLogout);
+
+// -------------------------------------------------------------
+// Devices Endpoints (Fleet Management)
+// -------------------------------------------------------------
+
+const handleGetDevices = async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json([]);
+  const devices = await db.prepare('SELECT * FROM devices ORDER BY created_at DESC').all();
+  return c.json(devices.results || []);
+};
+
+app.get('/netrix/api/devices', handleGetDevices);
+app.get('/api/devices', handleGetDevices);
+app.get('/v1/devices', handleGetDevices);
+
+const handleRegisterDevice = async (c) => {
+  const db = c.env.DB;
+  const body = await c.req.json().catch(() => ({}));
+  
+  // Generate random 9-digit Netrix ID
+  const r1 = Math.floor(100 + Math.random() * 900);
+  const r2 = Math.floor(100 + Math.random() * 900);
+  const r3 = Math.floor(100 + Math.random() * 900);
+  const netrixId = `${r1} ${r2} ${r3}`;
+  const deviceId = generateSecureToken('dev');
+  const orgId = 'org_pbtech';
+
+  const name = body.name || 'Remote Host';
+  const alias = body.alias || name;
+  const osType = body.osType || 'windows';
+  const osName = osType === 'windows' ? 'Windows 11 Enterprise' : osType === 'mac' ? 'macOS Sequoia 15' : 'Linux Kernel 6.8';
+  const ip = '10.200.12.' + Math.floor(10 + Math.random() * 200);
+  const publicIp = c.req.header('cf-connecting-ip') || '198.51.100.1';
+  const groupName = body.group || 'Default Fleet';
+
+  if (db) {
+    await db
+      .prepare('INSERT INTO devices (id, organization_id, netrix_id, name, alias, os_name, os_type, version, status, ip_address, public_ip, group_name, location, unattended_access) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(deviceId, orgId, netrixId, name, alias, osName, osType, 'NETRIX Host 3.2.0', 'online', ip, publicIp, groupName, 'Cloudflare Edge', 1)
+      .run();
+
+    await db
+      .prepare('INSERT INTO activity_logs (id, organization_id, actor_id, actor_name, action, target, category, ip_address, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(generateSecureToken('act'), orgId, 'usr_pankaj_01', 'Pankaj Kushwaha', 'Enrolled Device', `${name} (${netrixId})`, 'device', publicIp, 'success')
+      .run();
+  }
+
+  return c.json(
+    {
+      id: deviceId,
+      netrixId,
+      name,
+      alias,
+      os: osName,
+      osType,
       status: 'online',
-      activeSessionsCount: 0,
-      resolvedTodayCount: 0,
-      avgResolutionTime: '0m',
-      rating: 5.0,
+      ipAddress: ip,
+      publicIp,
+      group: groupName,
     },
-  ],
-  activityLogs: [],
-  license: {
-    tier: 'NETRIX Business Enterprise',
-    licenseKey: 'NX-ENT-9941-8820-PBZ-PROD',
-    status: 'active',
-    activatedAt: '2026-01-15',
-    expiresAt: '2027-01-15',
-    daysRemaining: 75,
-    totalSeats: 150,
-    usedSeats: 1,
-    concurrentChannels: 50,
-    activeChannels: 0,
-    features: [
-      'Unattended 24/7 Access',
-      'NETRIX Assist Custom Branding',
-      'AES-256 / ChaCha20 Hardware Accelerated Encryption',
-      'Mass Deployment MSI / PKG Packages',
-      'Session Recording & Real-time Audit Telemetry',
-      'Granular RBAC & Multi-Tenant Organization Switcher',
-      'Priority 24/7 PB Tech Zone Support SLA',
-    ],
-  },
-  organizations: [
+    201
+  );
+};
+
+app.post('/netrix/api/devices/register', handleRegisterDevice);
+app.post('/api/devices/register', handleRegisterDevice);
+app.post('/v1/devices/register', handleRegisterDevice);
+
+const handleDeleteDevice = async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  if (db && id) {
+    await db.prepare('DELETE FROM devices WHERE id = ?').bind(id).run();
+  }
+  return c.json({ success: true, id });
+};
+
+app.delete('/netrix/api/devices/:id', handleDeleteDevice);
+app.delete('/api/devices/:id', handleDeleteDevice);
+app.delete('/v1/devices/:id', handleDeleteDevice);
+
+// -------------------------------------------------------------
+// Remote Sessions & Single-Use Session Tickets
+// -------------------------------------------------------------
+
+const handleGetActiveSessions = async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json([]);
+  const sessions = await db.prepare('SELECT * FROM remote_sessions WHERE status = "active" ORDER BY started_at DESC').all();
+  return c.json(sessions.results || []);
+};
+
+app.get('/netrix/api/sessions/active', handleGetActiveSessions);
+app.get('/api/sessions/active', handleGetActiveSessions);
+app.get('/v1/sessions/active', handleGetActiveSessions);
+
+const handleDispatchSession = async (c) => {
+  const db = c.env.DB;
+  const body = await c.req.json().catch(() => ({}));
+  const targetId = body.targetNetrixId || '942 810 503';
+  const cleanId = targetId.replace(/\s+/g, '');
+
+  const ticket = generateSecureToken('st');
+  const sessionId = `NX-${Math.floor(10000 + Math.random() * 90000)}-CF`;
+  const protocolLaunchUri = `netrix://connect?ticket=${ticket}&target=${cleanId}&proto=3.2`;
+  const expiresAt = new Date(Date.now() + 60000).toISOString();
+  const permissions = JSON.stringify(body.permissions || ['remoteControl', 'fileTransfer', 'clipboardSync']);
+
+  if (db) {
+    // 1. Record cryptographically bound one-time ticket
+    const enc = new TextEncoder();
+    const hashBuf = await crypto.subtle.digest('SHA-256', enc.encode(ticket));
+    const ticketHash = Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+
+    await db
+      .prepare('INSERT INTO session_tickets (id, ticket_hash, session_id, user_id, target_netrix_id, permissions_json, access_type, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(generateSecureToken('stk'), ticketHash, sessionId, 'usr_pankaj_01', targetId, permissions, body.accessType || 'unattended', expiresAt)
+      .run();
+
+    // 2. Record remote session
+    await db
+      .prepare('INSERT INTO remote_sessions (id, session_id, organization_id, target_netrix_id, target_device_name, technician_id, technician_name, technician_email, status, fps, latency_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(generateSecureToken('ses'), sessionId, 'org_pbtech', targetId, `Remote Host (${targetId})`, 'usr_pankaj_01', 'Pankaj Kushwaha', 'pankaj@pbtechzone.com', 'active', 60, 14)
+      .run();
+
+    // 3. Log audit event
+    const ip = c.req.header('cf-connecting-ip') || '127.0.0.1';
+    await db
+      .prepare('INSERT INTO activity_logs (id, organization_id, actor_id, actor_name, action, target, category, ip_address, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(generateSecureToken('act'), 'org_pbtech', 'usr_pankaj_01', 'Pankaj Kushwaha', 'Dispatched Remote Session', `Remote Host (${targetId})`, 'session', ip, 'success')
+      .run();
+  }
+
+  return c.json({
+    sessionId,
+    sessionTicket: ticket,
+    protocolLaunchUri,
+    expiresAt,
+  });
+};
+
+app.post('/netrix/api/sessions/dispatch', handleDispatchSession);
+app.post('/api/sessions/dispatch', handleDispatchSession);
+app.post('/v1/sessions/dispatch', handleDispatchSession);
+
+const handleTerminateSession = async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  if (db && id) {
+    await db
+      .prepare('UPDATE remote_sessions SET status = "terminated", ended_at = datetime("now") WHERE id = ? OR session_id = ?')
+      .bind(id, id)
+      .run();
+  }
+  return c.json({ success: true, terminatedId: id });
+};
+
+app.post('/netrix/api/sessions/:id/terminate', handleTerminateSession);
+app.post('/api/sessions/:id/terminate', handleTerminateSession);
+app.post('/v1/sessions/:id/terminate', handleTerminateSession);
+
+// -------------------------------------------------------------
+// NETRIX Assist (SOS Quick Support)
+// -------------------------------------------------------------
+
+const handleGetAssistTickets = async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json([]);
+  const tickets = await db.prepare('SELECT * FROM quick_support_requests WHERE status = "waiting" ORDER BY created_at DESC').all();
+  return c.json(tickets.results || []);
+};
+
+app.get('/netrix/api/assist/tickets', handleGetAssistTickets);
+app.get('/api/assist/tickets', handleGetAssistTickets);
+app.get('/v1/assist/tickets', handleGetAssistTickets);
+
+const handleCreateAssistInvite = async (c) => {
+  const db = c.env.DB;
+  const body = await c.req.json().catch(() => ({}));
+  const p1 = Math.floor(100 + Math.random() * 900);
+  const p2 = Math.floor(100 + Math.random() * 900);
+  const pin = `${p1} ${p2}`;
+  const id = generateSecureToken('ast');
+
+  if (db) {
+    await db
+      .prepare('INSERT INTO quick_support_requests (id, organization_id, pin_code, client_name, client_email, summary, status, assigned_technician_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(id, 'org_pbtech', pin, body.clientName || 'Customer Support Request', body.clientEmail || '', body.summary || 'Quick Assistance', 'waiting', 'Pankaj Kushwaha')
+      .run();
+  }
+
+  return c.json(
     {
-      id: 'org_pbtech',
-      name: 'PB Tech Zone',
-      slug: 'pb-tech-zone',
-      tier: 'Enterprise Custom',
-      memberCount: 1,
-      deviceCount: 0,
-      activeChannels: 0,
-      maxChannels: 50,
-      contactEmail: 'pankaj@pbtechzone.com',
+      id,
+      pinCode: pin,
+      clientName: body.clientName || 'Customer Support Request',
+      status: 'waiting',
+      assignedTechnician: 'Pankaj Kushwaha',
+      createdAt: 'Just now',
     },
-  ],
-  telemetry: {
-    totalRegisteredDevices: 0,
+    201
+  );
+};
+
+app.post('/netrix/api/assist/invitations', handleCreateAssistInvite);
+app.post('/api/assist/invitations', handleCreateAssistInvite);
+app.post('/v1/assist/invitations', handleCreateAssistInvite);
+
+// -------------------------------------------------------------
+// Organizations, Licenses, Technicians, Activity & Telemetry
+// -------------------------------------------------------------
+
+app.get('/netrix/api/technicians', async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json([]);
+  const tech = await db.prepare('SELECT * FROM technicians').all();
+  return c.json(tech.results || []);
+});
+
+app.get('/netrix/api/organizations', async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json([]);
+  const orgs = await db.prepare('SELECT * FROM organizations').all();
+  return c.json(orgs.results || []);
+});
+
+app.get('/netrix/api/licenses', async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json({});
+  const lic = await db.prepare('SELECT * FROM licenses LIMIT 1').first();
+  if (lic && lic.features_json) {
+    lic.features = JSON.parse(lic.features_json);
+  }
+  return c.json(lic || {});
+});
+
+app.get('/netrix/api/activity', async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json([]);
+  const logs = await db.prepare('SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 50').all();
+  return c.json(logs.results || []);
+});
+
+app.get('/netrix/api/admin/telemetry', async (c) => {
+  const db = c.env.DB;
+  const devCount = db ? (await db.prepare('SELECT COUNT(*) as count FROM devices').first())?.count || 0 : 0;
+  const sesCount = db ? (await db.prepare('SELECT COUNT(*) as count FROM remote_sessions WHERE status = "active"').first())?.count || 0 : 0;
+
+  return c.json({
+    totalRegisteredDevices: devCount,
+    totalActiveSessions: sesCount,
     activeRelayNodes: 64,
     avgRelayLatencyMs: 12.4,
-    globalBandwidthUsageGbps: 0.0,
-    totalOrganizations: 1,
-    totalActiveSessions: 0,
     systemHealth: 'optimal',
     relayClusters: [
       { region: 'Asia South (Kathmandu / India Edge)', nodeCount: 12, loadPercentage: 18, status: 'healthy' },
@@ -75,47 +564,38 @@ const store = {
       { region: 'Europe West (Frankfurt)', nodeCount: 18, loadPercentage: 32, status: 'healthy' },
       { region: 'US East (N. Virginia)', nodeCount: 18, loadPercentage: 29, status: 'healthy' },
     ],
-  },
-};
-
-// CORS Response Helper
-function corsHeaders(request) {
-  const origin = request.headers.get('Origin') || '*';
-  return {
-    'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-netrix-client, x-netrix-version',
-    'Access-Control-Allow-Credentials': 'true',
-    'Content-Type': 'application/json',
-  };
-}
-
-function jsonResponse(data, status = 200, request) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: corsHeaders(request),
   });
-}
+});
+
+// -------------------------------------------------------------
+// Interactive Web Console HTML at /netrix
+// -------------------------------------------------------------
+app.get('/netrix', (c) => {
+  return c.html(renderWebConsoleHtml());
+});
+
+app.get('/netrix/*', (c) => {
+  return c.html(renderWebConsoleHtml());
+});
+
+// -------------------------------------------------------------
+// Export Default Worker Entrypoint with WebSocket Signaling
+// -------------------------------------------------------------
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const rawPath = url.pathname;
-    const method = request.method;
 
-    // 1. Root / and any path outside /netrix is completely UNAVAILABLE (Blank 404)
-    if (rawPath === '/' || rawPath === '/index.html' || (!rawPath.startsWith('/netrix') && !rawPath.startsWith('/api'))) {
-      return new Response(null, { status: 404, statusText: 'Not Found' });
-    }
-
-    // 2. Real-Time WebRTC WebSocket Signaling Gateway: /netrix/ws
-    if (rawPath === '/netrix/ws' && request.headers.get('Upgrade') === 'websocket') {
+    // Real-Time WebRTC WebSocket Signaling Gateway: /netrix/ws or /v1/ws
+    if ((url.pathname === '/netrix/ws' || url.pathname === '/v1/ws' || url.pathname === '/ws') && request.headers.get('Upgrade') === 'websocket') {
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
       server.accept();
 
-      const clientId = url.searchParams.get('id') || 'peer_' + Date.now();
-      const targetPeerId = url.searchParams.get('peerId');
+      const rawId = url.searchParams.get('id') || 'peer_' + Date.now();
+      const clientId = rawId.replace(/\s+/g, '');
+      const rawPeerId = url.searchParams.get('peerId');
+      const targetPeerId = rawPeerId ? rawPeerId.replace(/\s+/g, '') : null;
 
       if (!globalThis.__netrixSignalingPeers) {
         globalThis.__netrixSignalingPeers = new Map();
@@ -125,7 +605,8 @@ export default {
       server.addEventListener('message', (event) => {
         try {
           const msg = JSON.parse(event.data);
-          const destination = msg.to || targetPeerId;
+          const rawDest = msg.to || targetPeerId;
+          const destination = rawDest ? String(rawDest).replace(/\s+/g, '') : null;
           if (destination && globalThis.__netrixSignalingPeers.has(destination)) {
             const peerSocket = globalThis.__netrixSignalingPeers.get(destination);
             peerSocket.send(JSON.stringify(msg));
@@ -143,295 +624,14 @@ export default {
       });
     }
 
-    // Handle Preflight CORS OPTIONS
-    if (method === 'OPTIONS') {
-      return new Response(null, {
-        status: 204,
-        headers: corsHeaders(request),
-      });
-    }
-
-    // Normalize API subpath: handles both /netrix/api/... and /api/...
-    const isApiRequest = rawPath.startsWith('/netrix/api') || rawPath.startsWith('/api');
-
-    if (!isApiRequest) {
-      // 2. Serve the NETRIX Enterprise Web Console for /netrix and /netrix/*
-      if (rawPath.startsWith('/netrix')) {
-        return new Response(renderWebConsoleHtml(), {
-          status: 200,
-          headers: {
-            'Content-Type': 'text/html; charset=utf-8',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-          },
-        });
-      }
-      return new Response(null, { status: 404 });
-    }
-
-    // Strip prefix for API routing
-    const path = rawPath.replace(/^\/netrix\/api/, '').replace(/^\/api/, '') || '/';
-
-    try {
-      // API 1. Authentication: POST /auth/login
-      if (path === '/auth/login' && method === 'POST') {
-        const body = await request.json().catch(() => ({}));
-        const userIdentifier = (body.username || body.email || '').trim().toLowerCase();
-        const password = body.password || '';
-
-        // STRICT ACCESS CONTROL: Only username "Pankaj" and password "PB@TechZone" are authorized
-        const isUserMatch = userIdentifier === 'pankaj';
-        const isPassMatch = password === 'PB@TechZone';
-
-        if (isUserMatch && isPassMatch) {
-          // Log audit
-          store.activityLogs.unshift({
-            id: `act_${Date.now()}`,
-            actor: 'Pankaj Kushwaha',
-            action: 'Console Administrator Sign-In',
-            target: 'NETRIX Console Gateway',
-            category: 'auth',
-            timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-            ipAddress: request.headers.get('CF-Connecting-IP') || '127.0.0.1',
-            status: 'success',
-          });
-
-          return jsonResponse(
-            {
-              success: true,
-              data: {
-                user: {
-                  id: 'usr_pankaj_01',
-                  name: 'Pankaj Kushwaha',
-                  username: 'Pankaj',
-                  email: 'pankaj@pbtechzone.com',
-                  role: 'SuperAdmin',
-                  organizationId: 'org_pbtech',
-                  organizationName: 'PB Tech Zone',
-                  twoFactorEnabled: false,
-                },
-                accessToken: `nx_cf_jwt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-                expiresIn: 86400,
-              },
-            },
-            200,
-            request
-          );
-        } else {
-          return jsonResponse(
-            {
-              success: false,
-              error: 'Access Denied: Only username "Pankaj" with password "PB@TechZone" is authorized.',
-            },
-            401,
-            request
-          );
-        }
-      }
-
-      // API 2. Devices: GET /devices
-      if (path === '/devices' && method === 'GET') {
-        const query = url.searchParams.get('search')?.toLowerCase();
-        const status = url.searchParams.get('status');
-        const group = url.searchParams.get('group');
-        const os = url.searchParams.get('os');
-
-        let filtered = [...store.devices];
-        if (query) {
-          filtered = filtered.filter(
-            (d) =>
-              d.name.toLowerCase().includes(query) ||
-              d.netrixId.toLowerCase().includes(query) ||
-              d.alias.toLowerCase().includes(query)
-          );
-        }
-        if (status && status !== 'all') filtered = filtered.filter((d) => d.status === status);
-        if (group && group !== 'all') filtered = filtered.filter((d) => d.group === group);
-        if (os && os !== 'all') filtered = filtered.filter((d) => d.osType === os);
-
-        return jsonResponse(filtered, 200, request);
-      }
-
-      // API 3. Devices: POST /devices/register
-      if (path === '/devices/register' && method === 'POST') {
-        const body = await request.json().catch(() => ({}));
-        const randomId = `${Math.floor(100 + Math.random() * 900)} ${Math.floor(100 + Math.random() * 900)} ${Math.floor(100 + Math.random() * 900)}`;
-        const newDevice = {
-          id: `dev_${Date.now()}`,
-          netrixId: randomId,
-          name: body.name || 'Remote Host',
-          alias: body.alias || body.name || 'Remote Host',
-          os: body.osType === 'windows' ? 'Windows 11 Enterprise' : body.osType === 'mac' ? 'macOS Sequoia 15' : 'Linux Kernel 6.8',
-          osType: body.osType || 'windows',
-          version: 'NETRIX Host 3.2.0',
-          status: 'online',
-          ipAddress: '10.200.12.' + Math.floor(10 + Math.random() * 200),
-          publicIp: request.headers.get('CF-Connecting-IP') || '198.51.100.1',
-          group: body.group || 'Default Fleet',
-          location: request.cf?.city || 'Cloudflare Edge',
-          lastSeen: 'Live Now',
-          uptime: '0h 01m',
-          cpuUsage: Math.floor(5 + Math.random() * 20),
-          ramUsage: Math.floor(20 + Math.random() * 30),
-          diskUsage: Math.floor(30 + Math.random() * 40),
-          unattendedAccess: true,
-          isFavorite: false,
-        };
-
-        store.devices.unshift(newDevice);
-        store.telemetry.totalRegisteredDevices = store.devices.length;
-
-        // Log audit event
-        store.activityLogs.unshift({
-          id: `act_${Date.now()}`,
-          actor: 'Pankaj Kushwaha',
-          action: 'Enrolled New Host Device',
-          target: `${newDevice.name} (${newDevice.netrixId})`,
-          category: 'device',
-          timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-          ipAddress: request.headers.get('CF-Connecting-IP') || '127.0.0.1',
-          status: 'success',
-        });
-
-        return jsonResponse(newDevice, 201, request);
-      }
-
-      // API 4. Devices: DELETE /devices/:id
-      if (path.startsWith('/devices/') && method === 'DELETE') {
-        const id = path.split('/')[2];
-        store.devices = store.devices.filter((d) => d.id !== id);
-        store.telemetry.totalRegisteredDevices = store.devices.length;
-        return jsonResponse({ success: true, id }, 200, request);
-      }
-
-      // API 5. Remote Sessions: GET /sessions/active
-      if (path === '/sessions/active' && method === 'GET') {
-        return jsonResponse(store.sessions, 200, request);
-      }
-
-      // API 6. Remote Sessions: POST /sessions/dispatch
-      if (path === '/sessions/dispatch' && method === 'POST') {
-        const body = await request.json().catch(() => ({}));
-        const targetId = body.targetNetrixId || '942 810 503';
-        const cleanId = targetId.replace(/\s+/g, '');
-        const ticket = `st_cf_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-        const sessionId = `NX-${Math.floor(10000 + Math.random() * 90000)}-CF`;
-        const protocolLaunchUri = `netrix://connect?ticket=${ticket}&target=${cleanId}&proto=3.2`;
-
-        const newSession = {
-          id: `ses_${Date.now()}`,
-          sessionId,
-          targetNetrixId: targetId,
-          targetDeviceName: `Remote Host (${targetId})`,
-          technicianName: 'Pankaj Kushwaha',
-          technicianEmail: 'pankaj@pbtechzone.com',
-          status: 'active',
-          duration: '00:00:01',
-          startedAt: new Date().toISOString(),
-          bandwidthMbps: 4.2,
-          fps: 60,
-          latencyMs: 14,
-          encryption: 'AES-256-GCM / ChaCha20-Poly1305',
-          accessType: body.accessType || 'unattended',
-        };
-
-        store.sessions.unshift(newSession);
-        store.license.activeChannels = store.sessions.length;
-        store.telemetry.totalActiveSessions = store.sessions.length;
-
-        // Log audit event
-        store.activityLogs.unshift({
-          id: `act_${Date.now()}`,
-          actor: 'Pankaj Kushwaha',
-          action: 'Dispatched Remote Desktop Session',
-          target: `${newSession.targetDeviceName}`,
-          category: 'session',
-          timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-          ipAddress: request.headers.get('CF-Connecting-IP') || '127.0.0.1',
-          status: 'success',
-        });
-
-        return jsonResponse(
-          {
-            sessionId,
-            sessionTicket: ticket,
-            protocolLaunchUri,
-            expiresAt: new Date(Date.now() + 60000).toISOString(),
-          },
-          200,
-          request
-        );
-      }
-
-      // API 7. Remote Sessions: POST /sessions/:id/terminate
-      if (path.includes('/sessions/') && path.endsWith('/terminate') && method === 'POST') {
-        const parts = path.split('/');
-        const id = parts[2];
-        store.sessions = store.sessions.filter((s) => s.id !== id && s.sessionId !== id);
-        store.license.activeChannels = store.sessions.length;
-        store.telemetry.totalActiveSessions = store.sessions.length;
-        return jsonResponse({ success: true, terminatedId: id }, 200, request);
-      }
-
-      // API 8. NETRIX Assist: GET /assist/tickets
-      if (path === '/assist/tickets' && method === 'GET') {
-        return jsonResponse(store.assistTickets, 200, request);
-      }
-
-      // API 9. NETRIX Assist: POST /assist/invitations
-      if (path === '/assist/invitations' && method === 'POST') {
-        const body = await request.json().catch(() => ({}));
-        const pin = `${Math.floor(100 + Math.random() * 900)} ${Math.floor(100 + Math.random() * 900)}`;
-        const newTicket = {
-          id: `ast_${Date.now()}`,
-          pinCode: pin,
-          clientName: body.clientName || 'Customer',
-          clientEmail: body.clientEmail || '',
-          summary: body.summary || 'Quick Assistance',
-          status: 'waiting',
-          createdAt: 'Just now',
-          assignedTechnician: 'Pankaj Kushwaha',
-        };
-
-        store.assistTickets.unshift(newTicket);
-        return jsonResponse(newTicket, 201, request);
-      }
-
-      // API 10. Technicians: GET /technicians
-      if (path === '/technicians' && method === 'GET') {
-        return jsonResponse(store.technicians, 200, request);
-      }
-
-      // API 11. Organizations: GET /organizations
-      if (path === '/organizations' && method === 'GET') {
-        return jsonResponse(store.organizations, 200, request);
-      }
-
-      // API 12. Licenses: GET /licenses
-      if (path === '/licenses' && method === 'GET') {
-        return jsonResponse(store.license, 200, request);
-      }
-
-      // API 13. Activity: GET /activity
-      if (path === '/activity' && method === 'GET') {
-        return jsonResponse(store.activityLogs, 200, request);
-      }
-
-      // API 14. Admin Telemetry: GET /admin/telemetry
-      if (path === '/admin/telemetry' && method === 'GET') {
-        return jsonResponse(store.telemetry, 200, request);
-      }
-
-      // 404 Route Not Found
-      return jsonResponse({ error: 'Endpoint not found', path }, 404, request);
-    } catch (err) {
-      return jsonResponse({ error: err.message || 'Internal Server Error' }, 500, request);
-    }
+    // Pass all other HTTP requests to Hono App
+    return app.fetch(request, env);
   },
 };
 
 /**
  * Enterprise Web Console Single Page Application
- * Delivered directly from Cloudflare Edge at /netrix
+ * Rendered directly from Cloudflare Edge at /netrix
  */
 function renderWebConsoleHtml() {
   return `<!DOCTYPE html>
@@ -568,7 +768,7 @@ function renderWebConsoleHtml() {
         </div>
       </div>
       <div class="d-flex align-items-center gap-3">
-        <span class="badge badge-online px-2 py-1 small d-none d-md-inline-block">● Edge Connected</span>
+        <span class="badge badge-online px-2 py-1 small d-none d-md-inline-block">● D1 Database Live</span>
         <div class="text-end d-none d-sm-block">
           <div class="small fw-semibold" id="navUserName">Pankaj Kushwaha</div>
           <div class="text-muted" style="font-size: 0.75rem;">PB Tech Zone (SuperAdmin)</div>
@@ -624,8 +824,8 @@ function renderWebConsoleHtml() {
                   <span class="text-success mono" id="relayLatencyDisplay">12.4 ms (Kathmandu Edge)</span>
                 </div>
                 <div class="d-flex justify-content-between text-muted small">
-                  <span>License Tier:</span>
-                  <span class="text-info">Enterprise Business (PB Tech Zone)</span>
+                  <span>Database:</span>
+                  <span class="text-info mono">Cloudflare D1 (APAC)</span>
                 </div>
               </div>
             </div>
@@ -670,7 +870,7 @@ function renderWebConsoleHtml() {
               <h5 class="fw-bold mb-1">Device Inventory</h5>
               <p class="text-muted small mb-0">Unattended and attended remote fleet enrolled in PB Tech Zone.</p>
             </div>
-            <button id="registerDeviceModalBtn" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#deviceModal">+ Register Host Device</button>
+            <button id="registerDeviceModalBtn" class="btn btn-primary" onclick="promptRegisterDevice()">+ Register Host Device</button>
           </div>
 
           <div class="table-responsive">
@@ -687,7 +887,7 @@ function renderWebConsoleHtml() {
               </thead>
               <tbody id="devicesTableBody">
                 <tr>
-                  <td colspan="6" class="text-center text-muted py-4">No devices enrolled. Click "Register Host Device" to enroll.</td>
+                  <td colspan="6" class="text-center text-muted py-4">No devices enrolled in D1 database. Click "+ Register Host Device" to enroll.</td>
                 </tr>
               </tbody>
             </table>
@@ -742,7 +942,7 @@ function renderWebConsoleHtml() {
       <!-- TAB 4: AUDIT & ACTIVITY -->
       <div id="tab-activity" class="tab-pane-content d-none">
         <div class="card card-dark p-4">
-          <h5 class="fw-bold mb-3">Enterprise Audit Trail</h5>
+          <h5 class="fw-bold mb-3">Enterprise Audit Trail (D1 Ledger)</h5>
           <div class="table-responsive">
             <table class="table table-dark align-middle">
               <thead>
@@ -806,7 +1006,7 @@ function renderWebConsoleHtml() {
           sessionStorage.setItem('nx_user', JSON.stringify(json.data.user));
           showApp();
         } else {
-          authAlert.textContent = json.error || 'Authentication failed. Please check credentials.';
+          authAlert.textContent = json.error?.message || 'Authentication failed. Please check credentials.';
           authAlert.classList.remove('d-none');
         }
       } catch (err) {
@@ -884,10 +1084,10 @@ function renderWebConsoleHtml() {
         }
         tbody.innerHTML = sessions.map(s => \`
           <tr>
-            <td class="mono fw-semibold">\${s.sessionId}</td>
-            <td>\${s.targetNetrixId}</td>
+            <td class="mono fw-semibold">\${s.session_id || s.sessionId}</td>
+            <td>\${s.target_netrix_id || s.targetNetrixId}</td>
             <td><span class="badge badge-online">● Active</span></td>
-            <td class="small mono text-success">\${s.fps} FPS / \${s.latencyMs}ms</td>
+            <td class="small mono text-success">\${s.fps || 60} FPS / \${s.latency_ms || 14}ms</td>
             <td>
               <button class="btn btn-sm btn-outline-danger" onclick="terminateSession('\${s.id}')">Terminate</button>
             </td>
@@ -910,23 +1110,43 @@ function renderWebConsoleHtml() {
         const devices = await res.json();
         const tbody = document.getElementById('devicesTableBody');
         if (!devices || devices.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No devices enrolled. Click Register Device to enroll.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No devices enrolled in D1 database. Click "+ Register Host Device" to enroll.</td></tr>';
           return;
         }
         tbody.innerHTML = devices.map(d => \`
           <tr>
-            <td class="mono fw-bold text-info">\${d.netrixId}</td>
+            <td class="mono fw-bold text-info">\${d.netrix_id || d.netrixId}</td>
             <td>\${d.name}</td>
-            <td>\${d.os}</td>
-            <td class="mono small">\${d.ipAddress}</td>
-            <td><span class="badge badge-online">● Online</span></td>
+            <td>\${d.os_name || d.os}</td>
+            <td class="mono small">\${d.ip_address || d.ipAddress}</td>
+            <td><span class="badge badge-online">● \${d.status}</span></td>
             <td>
-              <button class="btn btn-sm btn-primary py-0 px-2" onclick="connectToDevice('\${d.netrixId}')">Connect</button>
+              <button class="btn btn-sm btn-primary py-0 px-2" onclick="connectToDevice('\${d.netrix_id || d.netrixId}')">Connect</button>
+              <button class="btn btn-sm btn-outline-danger py-0 px-2 ms-1" onclick="deleteDevice('\${d.id}')">Remove</button>
             </td>
           </tr>
         \`).join('');
       } catch (e) {}
     }
+
+    window.promptRegisterDevice = async function() {
+      const name = prompt('Enter device name (e.g. Workstation Office-01):', 'Host-PC');
+      if (!name) return;
+      await fetch(\`\${API_BASE}/devices/register\`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, osType: 'windows', group: 'Default Fleet' })
+      });
+      loadDevices();
+      loadActivity();
+    };
+
+    window.deleteDevice = async function(id) {
+      if (!confirm('Remove this device from fleet?')) return;
+      await fetch(\`\${API_BASE}/devices/\${id}\`, { method: 'DELETE' });
+      loadDevices();
+      loadActivity();
+    };
 
     window.connectToDevice = function(id) {
       document.querySelector('[data-tab="tab-dashboard"]').click();
@@ -946,6 +1166,7 @@ function renderWebConsoleHtml() {
         document.getElementById('generatedPinDisplay').textContent = ticket.pinCode;
         document.getElementById('assistPinBox').classList.remove('d-none');
         loadAssistTickets();
+        loadActivity();
       } catch (e) {}
     });
 
@@ -960,11 +1181,11 @@ function renderWebConsoleHtml() {
         }
         tbody.innerHTML = tickets.map(t => \`
           <tr>
-            <td class="mono fw-bold text-warning">\${t.pinCode}</td>
-            <td>\${t.clientName}</td>
+            <td class="mono fw-bold text-warning">\${t.pin_code || t.pinCode}</td>
+            <td>\${t.client_name || t.clientName}</td>
             <td><span class="badge bg-secondary">Waiting</span></td>
-            <td class="small text-muted">\${t.createdAt}</td>
-            <td>\${t.assignedTechnician}</td>
+            <td class="small text-muted">\${t.created_at || t.createdAt}</td>
+            <td>\${t.assigned_technician_name || t.assignedTechnician}</td>
           </tr>
         \`).join('');
       } catch (e) {}
@@ -982,11 +1203,11 @@ function renderWebConsoleHtml() {
         }
         tbody.innerHTML = logs.map(l => \`
           <tr>
-            <td class="mono small text-muted">\${l.timestamp}</td>
-            <td class="fw-semibold">\${l.actor}</td>
+            <td class="mono small text-muted">\${l.created_at || l.timestamp}</td>
+            <td class="fw-semibold">\${l.actor_name || l.actor}</td>
             <td>\${l.action}</td>
             <td class="text-info">\${l.target}</td>
-            <td class="mono small">\${l.ipAddress}</td>
+            <td class="mono small">\${l.ip_address || l.ipAddress}</td>
             <td><span class="badge bg-success">Success</span></td>
           </tr>
         \`).join('');

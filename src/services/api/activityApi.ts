@@ -1,5 +1,5 @@
 import { baseApi } from './baseApi';
-import { MockActivityLog } from '../mock/mockData';
+import { ActivityLog } from '@/types/models';
 
 export interface GetActivityParams {
   category?: string;
@@ -8,7 +8,7 @@ export interface GetActivityParams {
 
 export const activityApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getActivityLogs: builder.query<MockActivityLog[], GetActivityParams | void>({
+    getActivityLogs: builder.query<ActivityLog[], GetActivityParams | void>({
       query: (params) => ({
         url: '/activity',
         params: params || {},
@@ -16,7 +16,7 @@ export const activityApi = baseApi.injectEndpoints({
       providesTags: ['Activity'],
     }),
 
-    addAuditLog: builder.mutation<MockActivityLog, Omit<MockActivityLog, 'id' | 'timestamp'>>({
+    addAuditLog: builder.mutation<ActivityLog, Omit<ActivityLog, 'id' | 'timestamp'>>({
       query: (body) => ({
         url: '/activity',
         method: 'POST',

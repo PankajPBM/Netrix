@@ -1,14 +1,14 @@
 import { baseApi } from './baseApi';
-import { MockTechnician } from '../mock/mockData';
+import { Technician } from '@/types/models';
 
 export const technicianApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getTechnicians: builder.query<MockTechnician[], void>({
+    getTechnicians: builder.query<Technician[], void>({
       query: () => '/technicians',
       providesTags: ['Technicians'],
     }),
 
-    updateTechnicianStatus: builder.mutation<MockTechnician, { id: string; status: MockTechnician['status'] }>({
+    updateTechnicianStatus: builder.mutation<Technician, { id: string; status: Technician['status'] }>({
       query: ({ id, status }) => ({
         url: `/technicians/${id}/status`,
         method: 'PATCH',

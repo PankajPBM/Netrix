@@ -1,5 +1,5 @@
 import { baseApi } from './baseApi';
-import { MockDevice } from '../mock/mockData';
+import { Device } from '@/types/models';
 
 export interface GetDevicesParams {
   search?: string;
@@ -11,7 +11,7 @@ export interface GetDevicesParams {
 
 export const deviceApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getDevices: builder.query<MockDevice[], GetDevicesParams | void>({
+    getDevices: builder.query<Device[], GetDevicesParams | void>({
       query: (params) => ({
         url: '/devices',
         params: params || {},
@@ -25,12 +25,12 @@ export const deviceApi = baseApi.injectEndpoints({
           : [{ type: 'Devices', id: 'LIST' }],
     }),
 
-    getDeviceById: builder.query<MockDevice, string>({
+    getDeviceById: builder.query<Device, string>({
       query: (id) => `/devices/${id}`,
       providesTags: (_res, _err, id) => [{ type: 'Devices', id }],
     }),
 
-    toggleDeviceFavorite: builder.mutation<MockDevice, string>({
+    toggleDeviceFavorite: builder.mutation<Device, string>({
       query: (id) => ({
         url: `/devices/${id}/favorite`,
         method: 'PATCH',
@@ -41,7 +41,7 @@ export const deviceApi = baseApi.injectEndpoints({
       ],
     }),
 
-    registerDevice: builder.mutation<MockDevice, { name: string; alias: string; group: string; osType: 'windows' | 'mac' | 'linux' | 'android' }>({
+    registerDevice: builder.mutation<Device, { name: string; alias: string; group: string; osType: 'windows' | 'mac' | 'linux' | 'android' }>({
       query: (body) => ({
         url: '/devices/register',
         method: 'POST',
