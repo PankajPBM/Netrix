@@ -33,3 +33,4 @@ In your terminal, run:
 cd cloudflare-worker
 npx wrangler deploy
 ```
+

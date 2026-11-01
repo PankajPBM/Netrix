@@ -11,10 +11,17 @@ describe('Auth Validation Schemas', () => {
     expect(valid.success).toBe(true);
   });
 
-  it('rejects invalid email formats', () => {
+  it('validates username or business email format', () => {
+    const validUsername = loginSchema.safeParse({
+      email: 'Pankaj',
+      password: 'PB@TechZone',
+      rememberMe: true,
+    });
+    expect(validUsername.success).toBe(true);
+
     const invalid = loginSchema.safeParse({
-      email: 'invalid-email-address',
-      password: 'password123',
+      email: 'a',
+      password: '123',
     });
     expect(invalid.success).toBe(false);
   });

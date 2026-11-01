@@ -34,12 +34,18 @@ export const LoginPage: React.FC = () => {
     // Authenticate user credentials
     setTimeout(() => {
       setIsSubmitting(false);
-      if (data.email.includes('@') && data.password.length >= 8) {
+      const inputUser = data.email.trim();
+      const lower = inputUser.toLowerCase();
+      const isAuthorizedUser = lower === 'pankaj' || lower === 'admin@pbtechzone.com' || lower === 'pankaj@pbtechzone.com';
+      const isAuthorizedPass = data.password === 'PB@TechZone' || data.password === 'Admin1234!';
+
+      if ((isAuthorizedUser || inputUser.includes('@')) && (isAuthorizedPass || data.password.length >= 8)) {
         dispatch(
           setCredentials({
             user: {
               ...DEFAULT_MOCK_USER,
-              email: data.email,
+              username: 'Pankaj',
+              email: inputUser.includes('@') ? inputUser : 'pankaj@pbtechzone.com',
               name: 'Pankaj Kushwaha',
               organizationName: 'PB Tech Zone',
             },
@@ -48,7 +54,7 @@ export const LoginPage: React.FC = () => {
         );
         navigate('/');
       } else {
-        setAuthError('Invalid credentials. Please verify your email and password.');
+        setAuthError('Invalid credentials. Please verify your username (Pankaj) and password (PB@TechZone).');
       }
     }, 600);
   };
@@ -69,19 +75,19 @@ export const LoginPage: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmit(onSubmit)}>
-          {/* Email */}
+          {/* Username / Email */}
           <div className="mb-3">
-            <label className="form-label" htmlFor="login-email">Enterprise Email</label>
+            <label className="form-label" htmlFor="login-email">Username or Enterprise Email</label>
             <div className="input-group">
               <span className="input-group-text">
                 <Mail size={16} />
               </span>
               <input
                 id="login-email"
-                type="email"
+                type="text"
                 className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-                placeholder="name@pbtechzone.com"
-                autoComplete="email"
+                placeholder="Pankaj or admin@pbtechzone.com"
+                autoComplete="username"
                 {...register('email')}
               />
             </div>

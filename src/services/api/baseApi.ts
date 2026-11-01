@@ -1,7 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '@/app/store';
 
-const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://netrix.prakashkushwaha77.com.np/api';
+const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://netrix.prakashkushwaha77.com.np/netrix/api';
 
 export const baseApi = createApi({
   reducerPath: 'api',

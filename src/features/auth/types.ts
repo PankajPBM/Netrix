@@ -3,6 +3,7 @@ export type UserRole = 'SuperAdmin' | 'OrgAdmin' | 'TechnicianLead' | 'Technicia
 export interface User {
   id: string;
   email: string;
+  username?: string;
   name: string;
   role: UserRole;
   organizationId: string;
