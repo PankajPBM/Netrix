@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Monitor,
   Radio,
@@ -9,6 +9,9 @@ import {
   RefreshCw,
   Clock,
   Sparkles,
+  Copy,
+  Check,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -29,8 +32,13 @@ import { useGetActiveSessionsQuery } from '@/services/api/sessionApi';
 import { useGetActivityLogsQuery } from '@/services/api/activityApi';
 import { useGetCurrentLicenseQuery } from '@/services/api/licenseApi';
 import { useAppDispatch, useAppSelector } from '@/app/store';
-import { openQuickConnectModal } from '@/features/remote-sessions/sessionUiSlice';
+import { openQuickConnectModal, openRemoteViewer } from '@/features/remote-sessions/sessionUiSlice';
 import { Link } from 'react-router-dom';
+import {
+  getLocalNetrixId,
+  getLocalOneTimePassword,
+  regenerateOneTimePassword,
+} from '@/services/device/localDevice';
 
 const emptyTrendData = [
   { time: '00:00', sessions: 0, bandwidth: 0 },
@@ -45,6 +53,45 @@ const emptyTrendData = [
 export const DashboardPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
+
+  const [localId, setLocalId] = useState('');
+  const [localPin, setLocalPin] = useState('');
+  const [copiedId, setCopiedId] = useState(false);
+  const [copiedPin, setCopiedPin] = useState(false);
+  const [remoteIdInput, setRemoteIdInput] = useState('');
+  const [remotePinInput, setRemotePinInput] = useState('');
+
+  useEffect(() => {
+    setLocalId(getLocalNetrixId());
+    setLocalPin(getLocalOneTimePassword());
+  }, []);
+
+  const handleCopyId = () => {
+    if (localId) {
+      navigator.clipboard.writeText(localId);
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2000);
+    }
+  };
+
+  const handleCopyPin = () => {
+    if (localPin) {
+      navigator.clipboard.writeText(localPin);
+      setCopiedPin(true);
+      setTimeout(() => setCopiedPin(false), 2000);
+    }
+  };
+
+  const handleRegeneratePin = () => {
+    const newPin = regenerateOneTimePassword();
+    setLocalPin(newPin);
+  };
+
+  const handleDirectConnect = () => {
+    const target = remoteIdInput.trim();
+    if (!target) return;
+    dispatch(openRemoteViewer({ targetId: target, role: 'client' }));
+  };
 
   const { data: devices, isLoading: isDevicesLoading, refetch: refetchDevices } = useGetDevicesQuery();
   const { data: activeSessions, isLoading: isSessionsLoading } = useGetActiveSessionsQuery();
@@ -79,6 +126,186 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="d-flex flex-column gap-4">
+      {/* ANYDESK / ULTRAVIEWER PREMIUM REMOTE CONNECT HUB */}
+      <div className="row g-3">
+        {/* THIS DESK (ALLOW REMOTE ACCESS) */}
+        <div className="col-12 col-lg-6">
+          <div
+            className="card h-100 shadow-sm border-0 position-relative overflow-hidden"
+            style={{
+              backgroundColor: '#0F172A',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              borderRadius: '12px',
+            }}
+          >
+            <div className="card-header bg-transparent d-flex justify-content-between align-items-center pb-2 pt-3 px-4 border-0">
+              <div className="d-flex align-items-center gap-2">
+                <div
+                  className="rounded-2 p-2 d-flex align-items-center justify-content-center"
+                  style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#38BDF8' }}
+                >
+                  <Monitor size={20} />
+                </div>
+                <div>
+                  <h2 className="fs-6 fw-bold text-white mb-0">This Desk</h2>
+                  <span className="text-muted small">Allow remote control of this computer</span>
+                </div>
+              </div>
+              <span className="badge bg-success-subtle text-success d-flex align-items-center gap-1 py-1 px-2">
+                <span className="rounded-circle bg-success d-inline-block" style={{ width: 7, height: 7 }} />
+                <span>Ready to Connect</span>
+              </span>
+            </div>
+
+            <div className="card-body px-4 py-3 d-flex flex-column gap-3">
+              <div>
+                <label className="text-muted small text-uppercase fw-semibold mb-1 d-block">Your NETRIX ID</label>
+                <div className="d-flex align-items-center gap-2 p-2 rounded-2" style={{ backgroundColor: '#1E293B', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <span className="fs-4 fw-bold font-mono text-primary flex-grow-1 px-2">{localId}</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyId}
+                    className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
+                  >
+                    {copiedId ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+                    <span>{copiedId ? 'Copied' : 'Copy'}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div className="d-flex justify-content-between align-items-center mb-1">
+                  <label className="text-muted small text-uppercase fw-semibold mb-0">One-Time Password / PIN</label>
+                  <button
+                    type="button"
+                    onClick={handleRegeneratePin}
+                    className="btn btn-ghost btn-sm p-0 text-primary small d-flex align-items-center gap-1"
+                    style={{ fontSize: '0.75rem' }}
+                  >
+                    <RefreshCw size={11} />
+                    <span>Regenerate</span>
+                  </button>
+                </div>
+                <div className="d-flex align-items-center gap-2 p-2 rounded-2" style={{ backgroundColor: '#1E293B', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <span className="fs-5 fw-bold font-mono text-warning flex-grow-1 px-2">{localPin}</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyPin}
+                    className="btn btn-ghost btn-sm text-muted"
+                    title="Copy Password"
+                  >
+                    {copiedPin ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="small text-muted p-2 rounded-2 d-flex align-items-start gap-2" style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
+                <ShieldCheck size={16} className="text-info flex-shrink-0 mt-1" />
+                <span>Share your ID and Password with the person who needs to access this computer. Incoming sessions will also prompt for your consent.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* REMOTE DESK (CONNECT TO ANOTHER COMPUTER) */}
+        <div className="col-12 col-lg-6">
+          <div
+            className="card h-100 shadow-sm border-0 position-relative overflow-hidden"
+            style={{
+              backgroundColor: '#0F172A',
+              border: '1px solid rgba(37, 99, 235, 0.35)',
+              borderRadius: '12px',
+            }}
+          >
+            <div className="card-header bg-transparent d-flex justify-content-between align-items-center pb-2 pt-3 px-4 border-0">
+              <div className="d-flex align-items-center gap-2">
+                <div
+                  className="rounded-2 p-2 d-flex align-items-center justify-content-center"
+                  style={{ backgroundColor: 'rgba(37, 99, 235, 0.15)', color: '#60A5FA' }}
+                >
+                  <Cast size={20} />
+                </div>
+                <div>
+                  <h2 className="fs-6 fw-bold text-white mb-0">Remote Desk</h2>
+                  <span className="text-muted small">Connect to and control a remote computer</span>
+                </div>
+              </div>
+              <span className="badge bg-primary-subtle text-primary py-1 px-2">
+                P2P / Relay E2EE
+              </span>
+            </div>
+
+            <div className="card-body px-4 py-3 d-flex flex-column gap-3">
+              <div>
+                <label className="text-muted small text-uppercase fw-semibold mb-1 d-block">Remote NETRIX ID</label>
+                <div className="input-group">
+                  <input
+                    type="text"
+                    className="form-control form-control-lg font-mono text-white"
+                    placeholder="Enter ID (e.g. 942 810 503)"
+                    value={remoteIdInput}
+                    onChange={(e) => setRemoteIdInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleDirectConnect()}
+                    style={{
+                      backgroundColor: '#1E293B',
+                      borderColor: 'rgba(255, 255, 255, 0.12)',
+                      letterSpacing: '1px',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-muted small text-uppercase fw-semibold mb-1 d-block">Remote Password (Optional)</label>
+                <div className="input-group">
+                  <input
+                    type="password"
+                    className="form-control font-mono text-white"
+                    placeholder="Enter security password if required"
+                    value={remotePinInput}
+                    onChange={(e) => setRemotePinInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleDirectConnect()}
+                    style={{
+                      backgroundColor: '#1E293B',
+                      borderColor: 'rgba(255, 255, 255, 0.12)',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="d-flex gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={!remoteIdInput.trim()}
+                  onClick={handleDirectConnect}
+                  className="btn btn-primary btn-lg flex-grow-1 d-flex align-items-center justify-content-center gap-2 fw-semibold"
+                  style={{ height: '48px' }}
+                >
+                  <Zap size={18} fill="currentColor" />
+                  <span>Connect</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={!remoteIdInput.trim()}
+                  onClick={handleDirectConnect}
+                  className="btn btn-outline-secondary d-flex align-items-center justify-content-center px-3"
+                  title="Direct File Transfer"
+                >
+                  <span>Files</span>
+                </button>
+              </div>
+
+              <div className="small text-muted d-flex align-items-center justify-content-between">
+                <span>Instant encrypted WebRTC connection</span>
+                <Link to="/assist" className="text-primary text-decoration-none small">
+                  Support PIN Code &rarr;
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Welcome Banner */}
       <div className="card shadow-sm border-0" style={{ background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%)' }}>
         <div className="card-body p-4 d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
@@ -388,7 +615,9 @@ export const DashboardPage: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <div className="d-flex justify-content-between align-items-center">
                         <span className="fw-semibold text-white small text-truncate">{log.action}</span>
-                        <span className="text-muted font-mono" style={{ fontSize: '0.6875rem' }}>{log.timestamp.slice(11, 16)}</span>
+                        <span className="text-muted font-mono" style={{ fontSize: '0.6875rem' }}>
+                          {log.timestamp ? log.timestamp.slice(11, 16) : (log.created_at ? log.created_at.slice(11, 16) : '--:--')}
+                        </span>
                       </div>
                       <div className="text-muted small text-truncate">{log.target} &bull; {log.actor}</div>
                     </div>

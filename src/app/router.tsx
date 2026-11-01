@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createHashRouter } from 'react-router-dom';
 import { AppLayout } from '@/layouts/AppLayout';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { AuthGuard } from './guards/AuthGuard';
@@ -27,7 +27,7 @@ import { SessionExpiredPage } from '@/features/auth/pages/SessionExpiredPage';
 import { AccessDeniedPage } from '@/features/auth/pages/AccessDeniedPage';
 import { NotFoundPage } from '@/components/feedback/NotFoundPage';
 
-export const router = createBrowserRouter([
+export const router = createHashRouter([
   // Protected Console Shell
   {
     path: '/',

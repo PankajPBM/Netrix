@@ -15,7 +15,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   pulse = false,
   className = '',
 }) => {
-  const normStatus = status.toLowerCase() as StatusType;
+  const normStatus = ((status || 'offline') + '').toLowerCase() as StatusType;
 
   const badgeClass = {
     online: 'badge-online',
@@ -33,7 +33,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     info: 'bg-info',
   }[normStatus] || 'bg-secondary';
 
-  const displayLabel = label || normStatus.charAt(0).toUpperCase() + normStatus.slice(1);
+  const displayLabel = label || (normStatus ? normStatus.charAt(0).toUpperCase() + normStatus.slice(1) : 'Unknown');
 
   return (
     <span className={`badge ${badgeClass} ${className}`}>

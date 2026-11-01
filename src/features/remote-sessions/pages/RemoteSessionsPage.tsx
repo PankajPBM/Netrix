@@ -177,7 +177,9 @@ export const RemoteSessionsPage: React.FC = () => {
                         </td>
                         <td>
                           <div className="font-mono text-white fw-medium">{session.duration}</div>
-                          <div className="text-muted small">Started {session.startedAt.slice(11, 16)} UTC</div>
+                          <div className="text-muted small">
+                            Started {session.startedAt ? session.startedAt.slice(11, 16) : (session.started_at ? session.started_at.slice(11, 16) : 'Recently')} UTC
+                          </div>
                         </td>
                         <td>
                           <div className="text-white small">{session.bandwidthMbps} Mbps &bull; {session.fps} FPS</div>

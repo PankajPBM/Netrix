@@ -12,19 +12,39 @@ export const DEFAULT_MOCK_USER: User = {
   lastLoginAt: new Date().toISOString(),
 };
 
-// Application starts in clean signed-out state requiring real login
-const initialState: AuthState = {
-  user: null,
-  accessToken: null,
-  isAuthenticated: false,
-  isLoading: false,
-  error: null,
-  twoFactorPending: {
-    pending: false,
-    tempToken: null,
-    email: null,
-  },
-};
+const isDesktopMode =
+  typeof window !== 'undefined' &&
+  (Boolean(window.netrixDesktop) ||
+    window.location.protocol === 'file:' ||
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1');
+
+// Desktop client starts pre-authenticated for immediate remote control
+const initialState: AuthState = isDesktopMode
+  ? {
+      user: DEFAULT_MOCK_USER,
+      accessToken: 'netrix_desktop_local_session',
+      isAuthenticated: true,
+      isLoading: false,
+      error: null,
+      twoFactorPending: {
+        pending: false,
+        tempToken: null,
+        email: null,
+      },
+    }
+  : {
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+      twoFactorPending: {
+        pending: false,
+        tempToken: null,
+        email: null,
+      },
+    };
 
 export const authSlice = createSlice({
   name: 'auth',

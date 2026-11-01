@@ -4,6 +4,7 @@
  */
 
 const LOCAL_DEVICE_STORAGE_KEY = 'netrix_local_device_id';
+const LOCAL_DEVICE_PIN_KEY = 'netrix_local_device_pin';
 
 function generateRandomSegment(): string {
   const num = Math.floor(100 + Math.random() * 900);
@@ -22,4 +23,20 @@ export function getLocalNetrixId(): string {
 export function getNormalizedLocalNetrixId(): string {
   return getLocalNetrixId().replace(/\s+/g, '');
 }
+
+export function getLocalOneTimePassword(): string {
+  let pin = localStorage.getItem(LOCAL_DEVICE_PIN_KEY);
+  if (!pin) {
+    pin = String(Math.floor(1000 + Math.random() * 9000));
+    localStorage.setItem(LOCAL_DEVICE_PIN_KEY, pin);
+  }
+  return pin;
+}
+
+export function regenerateOneTimePassword(): string {
+  const pin = String(Math.floor(1000 + Math.random() * 9000));
+  localStorage.setItem(LOCAL_DEVICE_PIN_KEY, pin);
+  return pin;
+}
+
 

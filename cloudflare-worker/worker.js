@@ -544,7 +544,13 @@ app.get('/netrix/api/activity', async (c) => {
   const db = c.env.DB;
   if (!db) return c.json([]);
   const logs = await db.prepare('SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 50').all();
-  return c.json(logs.results || []);
+  const mapped = (logs.results || []).map((l) => ({
+    ...l,
+    actor: l.actor_name || l.actor || 'System',
+    timestamp: l.created_at || l.timestamp || new Date().toISOString(),
+    ipAddress: l.ip_address || l.ipAddress || '127.0.0.1',
+  }));
+  return c.json(mapped);
 });
 
 app.get('/netrix/api/admin/telemetry', async (c) => {
