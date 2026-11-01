@@ -1,0 +1,30 @@
+// NETRIX Master Style Entrypoint
+// PB Tech Zone - Enterprise Remote Access
+
+// 1. Abstracts & Tokens
+@import './abstracts/variables';
+@import './abstracts/mixins';
+
+// 2. Bootstrap Core Framework
+@import 'bootstrap/scss/bootstrap';
+
+// 3. Custom NETRIX Overrides
+@import './bootstrap-overrides';
+
+// 4. Layouts
+@import './layouts/sidebar';
+@import './layouts/header';
+@import './layouts/app-layout';
+
+// 5. Utility additions
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.user-select-none {
+  user-select: none;
+}
+
+.transition-all {
+  transition: all 0.15s ease-in-out;
+}

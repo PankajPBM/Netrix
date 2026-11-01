@@ -1,0 +1,324 @@
+// NETRIX Bootstrap Overrides & Integration
+@import './abstracts/variables';
+@import './abstracts/mixins';
+
+// Global Reset & Body
+body.netrix-app-body {
+  font-family: var(--netrix-font-sans);
+  background-color: var(--netrix-bg-app);
+  color: var(--netrix-text-primary);
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+// Typography Links
+a {
+  color: var(--netrix-brand-400);
+  text-decoration: none;
+  transition: color 0.15s ease-in-out;
+  &:hover {
+    color: var(--netrix-brand-300);
+  }
+}
+
+// Code & Monospace IDs
+code, kbd, samp, pre, .font-mono {
+  font-family: var(--netrix-font-mono) !important;
+}
+
+// Buttons
+.btn {
+  font-family: var(--netrix-font-sans);
+  font-weight: 500;
+  font-size: 0.875rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--netrix-radius-md);
+  transition: all 0.15s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+
+  &:focus, &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.btn-primary {
+  background-color: var(--netrix-brand-500);
+  border-color: var(--netrix-brand-500);
+  color: #ffffff;
+
+  &:hover, &:active, &.active {
+    background-color: var(--netrix-brand-400);
+    border-color: var(--netrix-brand-400);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  }
+
+  &:disabled {
+    background-color: var(--netrix-brand-700);
+    border-color: var(--netrix-brand-700);
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.btn-outline-primary {
+  border-color: var(--netrix-brand-500);
+  color: var(--netrix-brand-400);
+  background: transparent;
+
+  &:hover, &:active {
+    background-color: var(--netrix-brand-500);
+    border-color: var(--netrix-brand-500);
+    color: #ffffff;
+  }
+}
+
+.btn-secondary, .btn-ghost {
+  background-color: var(--netrix-bg-surface-elevated);
+  border-color: var(--netrix-border);
+  color: var(--netrix-text-primary);
+
+  &:hover, &:active {
+    background-color: var(--netrix-bg-surface-hover);
+    border-color: var(--netrix-border-strong);
+    color: var(--netrix-text-primary);
+  }
+}
+
+.btn-danger {
+  background-color: var(--netrix-status-danger);
+  border-color: var(--netrix-status-danger);
+  color: #ffffff;
+
+  &:hover, &:active {
+    background-color: #dc2626;
+    border-color: #dc2626;
+  }
+}
+
+.btn-success {
+  background-color: var(--netrix-status-online);
+  border-color: var(--netrix-status-online);
+  color: #ffffff;
+
+  &:hover, &:active {
+    background-color: #059669;
+    border-color: #059669;
+  }
+}
+
+// Cards
+.card {
+  background-color: var(--netrix-bg-surface);
+  border: 1px solid var(--netrix-border);
+  border-radius: var(--netrix-radius-lg);
+  box-shadow: var(--netrix-shadow-sm);
+  color: var(--netrix-text-primary);
+  overflow: hidden;
+
+  .card-header {
+    background-color: var(--netrix-bg-surface);
+    border-bottom: 1px solid var(--netrix-border);
+    padding: 1rem 1.25rem;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .card-body {
+    padding: 1.25rem;
+  }
+
+  .card-footer {
+    background-color: var(--netrix-bg-surface-elevated);
+    border-top: 1px solid var(--netrix-border);
+    padding: 0.875rem 1.25rem;
+  }
+}
+
+// Form Controls
+.form-control, .form-select {
+  background-color: var(--netrix-bg-input);
+  border: 1px solid var(--netrix-border);
+  border-radius: var(--netrix-radius-md);
+  color: var(--netrix-text-primary);
+  font-size: 0.875rem;
+  padding: 0.55rem 0.85rem;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+
+  &:focus {
+    background-color: var(--netrix-bg-input);
+    color: var(--netrix-text-primary);
+    @include focus-ring;
+  }
+
+  &::placeholder {
+    color: var(--netrix-text-muted);
+  }
+
+  &:disabled {
+    background-color: var(--netrix-bg-surface-elevated);
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+}
+
+.input-group-text {
+  background-color: var(--netrix-bg-surface-elevated);
+  border-color: var(--netrix-border);
+  color: var(--netrix-text-muted);
+}
+
+.form-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--netrix-text-secondary);
+  margin-bottom: 0.35rem;
+}
+
+// Badges
+.badge {
+  font-weight: 500;
+  font-size: 0.75rem;
+  padding: 0.3em 0.65em;
+  border-radius: var(--netrix-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.badge-online {
+  background-color: var(--netrix-status-online-bg);
+  color: var(--netrix-status-online);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.badge-offline {
+  background-color: var(--netrix-status-offline-bg);
+  color: var(--netrix-status-offline);
+  border: 1px solid rgba(100, 116, 139, 0.25);
+}
+
+.badge-busy {
+  background-color: var(--netrix-status-busy-bg);
+  color: var(--netrix-status-busy);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.badge-danger {
+  background-color: var(--netrix-status-danger-bg);
+  color: var(--netrix-status-danger);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.badge-info {
+  background-color: var(--netrix-status-info-bg);
+  color: var(--netrix-status-info);
+  border: 1px solid rgba(14, 165, 233, 0.25);
+}
+
+// Tables
+.table {
+  color: var(--netrix-text-primary);
+  border-color: var(--netrix-border);
+  margin-bottom: 0;
+
+  th {
+    background-color: var(--netrix-bg-surface-elevated);
+    color: var(--netrix-text-secondary);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--netrix-border);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 0.85rem 1rem;
+    vertical-align: middle;
+    font-size: 0.875rem;
+    border-bottom: 1px solid var(--netrix-border);
+    background-color: transparent;
+  }
+
+  tbody tr {
+    transition: background-color 0.15s ease-in-out;
+    &:hover {
+      background-color: var(--netrix-bg-surface-hover) !important;
+    }
+  }
+}
+
+// Modals
+.modal-content {
+  background-color: var(--netrix-bg-surface);
+  border: 1px solid var(--netrix-border-strong);
+  border-radius: var(--netrix-radius-lg);
+  box-shadow: var(--netrix-shadow-modal);
+  color: var(--netrix-text-primary);
+
+  .modal-header {
+    border-bottom: 1px solid var(--netrix-border);
+    padding: 1.15rem 1.5rem;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .modal-footer {
+    border-top: 1px solid var(--netrix-border);
+    padding: 1rem 1.5rem;
+    background-color: var(--netrix-bg-surface-elevated);
+  }
+}
+
+.modal-backdrop.show {
+  opacity: 0.75;
+  backdrop-filter: blur(4px);
+}
+
+// Dropdowns
+.dropdown-menu {
+  background-color: var(--netrix-bg-surface-elevated);
+  border: 1px solid var(--netrix-border-strong);
+  border-radius: var(--netrix-radius-md);
+  box-shadow: var(--netrix-shadow-lg);
+  color: var(--netrix-text-primary);
+  padding: 0.5rem;
+
+  .dropdown-item {
+    color: var(--netrix-text-primary);
+    border-radius: var(--netrix-radius-sm);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    &:hover, &:focus {
+      background-color: var(--netrix-bg-surface-hover);
+      color: var(--netrix-brand-300);
+    }
+
+    &.text-danger:hover {
+      background-color: rgba(239, 68, 68, 0.15);
+      color: var(--netrix-status-danger);
+    }
+  }
+
+  .dropdown-divider {
+    border-color: var(--netrix-border);
+  }
+}

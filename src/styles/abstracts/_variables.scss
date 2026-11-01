@@ -1,0 +1,106 @@
+// NETRIX Design System Variables & Tokens
+// PB Tech Zone - Enterprise Remote Access
+
+:root {
+  // Brand Base Colors
+  --netrix-brand-950: #070a13;
+  --netrix-brand-900: #0f172a;
+  --netrix-brand-850: #141e33;
+  --netrix-brand-800: #1e293b;
+  --netrix-brand-700: #334155;
+  --netrix-brand-600: #475569;
+  --netrix-brand-500: #2563eb;
+  --netrix-brand-400: #3b82f6;
+  --netrix-brand-300: #60a5fa;
+  --netrix-brand-200: #93c5fd;
+  --netrix-brand-100: #dbeafe;
+  --netrix-brand-50:  #eff6ff;
+
+  // Accents
+  --netrix-accent-cyan: #06b6d4;
+  --netrix-accent-indigo: #6366f1;
+  --netrix-accent-violet: #8b5cf6;
+
+  // Semantic Status Colors
+  --netrix-status-online: #10b981;
+  --netrix-status-online-bg: rgba(16, 185, 129, 0.12);
+  --netrix-status-offline: #64748b;
+  --netrix-status-offline-bg: rgba(100, 116, 139, 0.12);
+  --netrix-status-busy: #f59e0b;
+  --netrix-status-busy-bg: rgba(245, 158, 11, 0.12);
+  --netrix-status-danger: #ef4444;
+  --netrix-status-danger-bg: rgba(239, 68, 68, 0.12);
+  --netrix-status-info: #0ea5e9;
+  --netrix-status-info-bg: rgba(14, 165, 233, 0.12);
+
+  // Typography
+  --netrix-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --netrix-font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  // Sizing & Radii
+  --netrix-radius-sm: 4px;
+  --netrix-radius-md: 6px;
+  --netrix-radius-lg: 8px;
+  --netrix-radius-xl: 12px;
+  --netrix-radius-full: 9999px;
+
+  // Sidebar Dimensions
+  --netrix-sidebar-width: 260px;
+  --netrix-sidebar-collapsed-width: 76px;
+  --netrix-header-height: 64px;
+}
+
+// Dark Theme (Default)
+[data-netrix-theme='dark'] {
+  --netrix-bg-app: #080c14;
+  --netrix-bg-surface: #0f172a;
+  --netrix-bg-surface-elevated: #162033;
+  --netrix-bg-surface-hover: #1e293b;
+  --netrix-bg-input: #0b1120;
+
+  --netrix-border: #1e293b;
+  --netrix-border-strong: #334155;
+  --netrix-border-subtle: #162238;
+
+  --netrix-text-primary: #f8fafc;
+  --netrix-text-secondary: #94a3b8;
+  --netrix-text-muted: #64748b;
+  --netrix-text-inverse: #0f172a;
+
+  --netrix-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
+  --netrix-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --netrix-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --netrix-shadow-modal: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+
+  // Bootstrap theme overrides in dark mode
+  --bs-body-bg: var(--netrix-bg-app);
+  --bs-body-color: var(--netrix-text-primary);
+  --bs-border-color: var(--netrix-border);
+}
+
+// Light Theme
+[data-netrix-theme='light'] {
+  --netrix-bg-app: #f4f6fa;
+  --netrix-bg-surface: #ffffff;
+  --netrix-bg-surface-elevated: #f8fafc;
+  --netrix-bg-surface-hover: #f1f5f9;
+  --netrix-bg-input: #ffffff;
+
+  --netrix-border: #e2e8f0;
+  --netrix-border-strong: #cbd5e1;
+  --netrix-border-subtle: #f1f5f9;
+
+  --netrix-text-primary: #0f172a;
+  --netrix-text-secondary: #475569;
+  --netrix-text-muted: #94a3b8;
+  --netrix-text-inverse: #ffffff;
+
+  --netrix-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.07);
+  --netrix-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --netrix-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  --netrix-shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+
+  --bs-body-bg: var(--netrix-bg-app);
+  --bs-body-color: var(--netrix-text-primary);
+  --bs-border-color: var(--netrix-border);
+}
